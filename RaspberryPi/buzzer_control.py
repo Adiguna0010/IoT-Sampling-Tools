@@ -1,11 +1,14 @@
 import RPi.GPIO as GPIO
 import time
+import board
+import adafruit_dht
 
 # ==========================================
 # Konfigurasi Pin
 # ==========================================
 # Pastikan menggunakan pin yang sama seperti sebelumnya
-PIN_BUZZER = 2
+PIN_BUZZER = 3
+PIN_DHT = board.D4
 
 def setup():
     # Menonaktifkan peringatan
@@ -39,19 +42,27 @@ def bunyikan_bip(durasi_nyala, durasi_mati, jumlah):
 
 def main():
     setup()
+    
+    try:
+        sensor_dht = adafruit_dht.DHT11(PIN_DHT)
+    except Exception as e:
+        print(f"Gagal inisialisasi DHT11: {e}")
+        sensor_dht = None
+
     try:
         print("=======================================")
-        print(" Kontrol Buzzer Aktif (MH-FMD)")
+        print(" Kontrol Buzzer Aktif (MH-FMD) & DHT11")
         print("=======================================")
         print("0 : Matikan Buzzer")
         print("1 : Nyalakan Buzzer (Terus-menerus)")
         print("2 : Bunyikan Bip Pendek (1x)")
         print("3 : Bunyikan Alarm Bip (3x)")
+        print("4 : Baca Sensor Suhu & Kelembaban (DHT11)")
         print("Ketik 'q' atau tekan Ctrl+C untuk keluar")
         print("=======================================")
         
         while True:
-            perintah = input("Masukkan perintah (0/1/2/3/q): ")
+            perintah = input("Masukkan perintah (0/1/2/3/4/q): ")
             
             if perintah == '0':
                 matikan_buzzer()
@@ -65,17 +76,34 @@ def main():
             elif perintah == '3':
                 print("-> Alarm Beep 3x...")
                 bunyikan_bip(0.4, 0.2, 3)
+            elif perintah == '4':
+                if sensor_dht:
+                    print("-> Membaca sensor DHT11...")
+                    try:
+                        suhu = sensor_dht.temperature
+                        kelembaban = sensor_dht.humidity
+                        if suhu is not None and kelembaban is not None:
+                            print(f"   Suhu: {suhu:.1f} °C")
+                            print(f"   Kelembaban: {kelembaban:.1f} %")
+                        else:
+                            print("   Gagal membaca data dari sensor DHT11.")
+                    except RuntimeError as error:
+                        print(f"   Error membaca sensor: {error.args[0]}")
+                else:
+                    print("-> Sensor DHT11 tidak diinisialisasi.")
             elif perintah.lower() == 'q':
                 print("Keluar dari program...")
                 break
             else:
-                print("-> Perintah tidak valid! Silakan masukkan 0, 1, 2, atau 3.")
+                print("-> Perintah tidak valid! Silakan masukkan 0, 1, 2, 3, 4, atau q.")
                 
     except KeyboardInterrupt:
         print("\nProgram dihentikan oleh user.")
     finally:
         # Selalu pastikan buzzer dimatikan dan pin dibersihkan saat keluar
         matikan_buzzer()
+        if 'sensor_dht' in locals() and sensor_dht:
+            sensor_dht.exit()
         GPIO.cleanup()
 
 if __name__ == '__main__':
