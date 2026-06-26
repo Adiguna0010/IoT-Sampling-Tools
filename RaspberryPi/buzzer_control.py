@@ -5,7 +5,7 @@ import time
 # Konfigurasi Pin
 # ==========================================
 # Pastikan menggunakan pin yang sama seperti sebelumnya
-PIN_BUZZER = 3
+PIN_BUZZER = 2
 
 def setup():
     # Menonaktifkan peringatan
