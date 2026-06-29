@@ -6,13 +6,12 @@ const port = 3000;
 app.use(express.json());
 
 // ==========================================
-// 1. KONEKSI KE DATABASE MYSQL
+// 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA)
 // ==========================================
-// Catatan: Kredensial disesuaikan dengan Database
 const db = mysql.createConnection({
-    host: 'localhost',
+    host: '10.5.24.253', 
     user: 'root',      
-    password: '',      
+    password: 'root123',      
     database: 'iot_padi' 
 });
 
@@ -25,53 +24,47 @@ db.connect((err) => {
 });
 
 // ==========================================
-// 2. POST /api/data (Menyimpan Data & Error Handling)
+// 2. POST /api/data (Sensor Data)
 // ==========================================
 app.post('/api/data', (req, res) => {
     const { suhu, kelembaban, gas_metana } = req.body;
+    if (!suhu || !kelembaban || !gas_metana) return res.status(400).json({ status: "gagal" });
 
-    // ERROR HANDLING 1: Validasi kelengkapan data dari sensor
-    if (!suhu || !kelembaban || !gas_metana) {
-        return res.status(400).json({ 
-            status: "gagal",
-            pesan: "Data tidak lengkap! Pastikan suhu, kelembaban, dan gas_metana terisi." 
-        });
-    }
-
-    // Perintah memasukkan data ke tabel
     const query = 'INSERT INTO sensor_data (suhu, kelembaban, gas_metana) VALUES (?, ?, ?)';
-    
     db.query(query, [suhu, kelembaban, gas_metana], (err, results) => {
-        // ERROR HANDLING 2: Jika MySQL gagal menyimpan
-        if (err) {
-            console.error("Gagal menyimpan ke database:", err);
-            return res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan di server database." });
-        }
-        
-        console.log("Data disimpan ke MySQL:", { id: results.insertId, suhu, kelembaban, gas_metana });
-        res.json({ status: "berhasil", pesan: "Data berhasil disimpan di MySQL", id_data: results.insertId });
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", id: results.insertId });
     });
 });
 
 // ==========================================
-// 3. GET /api/latest (Mengambil Data Terbaru untuk Dashboard)
+// 3. POST /api/commands (Data Array Mirza + Konversi Tanggal)
 // ==========================================
-app.get('/api/latest', (req, res) => {
-    // Perintah mengambil 1 data paling akhir (ID terbesar)
-    const query = 'SELECT * FROM sensor_data ORDER BY id DESC LIMIT 1';
-    
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Gagal mengambil data:", err);
-            return res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan saat mengambil data." });
-        }
-        
-        // Kirim datanya kembali ke klien
-        res.json({ status: "sukses", data: results[0] || null });
+app.post('/api/commands', (req, res) => {
+    const dataCommands = req.body;
+    if (!Array.isArray(dataCommands)) return res.status(400).json({ status: "gagal" });
+
+    const promises = dataCommands.map(item => {
+        // Konversi format tanggal menjadi YYYY-MM-DD HH:MM:SS
+        const formattedDate = new Date(item.created_at).toISOString().slice(0, 19).replace('T', ' ');
+
+        const query = 'INSERT INTO commands (chamber_id, command_name, command_value, created_at) VALUES (?, ?, ?, ?)';
+        return new Promise((resolve, reject) => {
+            db.query(query, [item.chamber_id, item.command_name, item.command_value, formattedDate], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
     });
+
+    Promise.all(promises)
+        .then(() => res.json({ status: "berhasil", pesan: "Data tersimpan" }))
+        .catch(err => res.status(500).json({ status: "gagal", pesan: err.message }));
 });
 
-// Menyalakan server
+// ==========================================
+// 4. MENYALAKAN SERVER
+// ==========================================
 app.listen(port, () => {
     console.log(`Server berjalan di http://localhost:${port}`);
 });
