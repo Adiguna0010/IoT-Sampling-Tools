@@ -1,198 +1,296 @@
-/* TEMA BRIN: Putih, Abu-abu Muda, Merah BRIN, Biru Gelap */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+:root {
+    /* Gradient pastel lembut meniru desain referensi */
+    --bg-grad: linear-gradient(135deg, #e4effd 0%, #f6f0ff 50%, #eef5ff 100%);
+    --panel-bg: rgba(255, 255, 255, 0.65);
+    --panel-border: rgba(255, 255, 255, 0.8);
+    --shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
+    --text-main: #334155;
+    --brin-red: #EE2A24;
+    --brin-blue: #0f62fe;
+}
 
 body {
-    background: #F4F6F9; /* Abu-abu muda khas dashboard terang */
-    color: #333333;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-/* NAVBAR */
-.navbar {
-    background: #FFFFFF;
-    padding: 15px 30px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    border-bottom: 4px solid #EE2A24; /* Aksen Merah BRIN di bawah header */
-}
-
-.logo {
-    font-size: 24px;
-    font-weight: bold;
-    color: #004A8F; /* Biru BRIN */
-}
-
-.logo i {
-    color: #EE2A24; /* Ikon Merah BRIN */
-}
-
-.status {
-    font-weight: bold;
-    color: #004A8F;
-}
-
-.online-dot {
-    height: 12px;
-    width: 12px;
-    background: #10B981; /* Hijau Online */
-    display: inline-block;
-    border-radius: 50%;
-    margin-right: 8px;
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    100% { box-shadow: 0 0 0 12px transparent; }
-}
-
-/* INFO CARDS (Top 4 Cards) */
-.info-card {
-    background: #FFFFFF;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-    transition: 0.3s;
-    border-left: 5px solid #004A8F; /* Garis aksen biru */
-}
-
-.info-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-}
-
-.info-card h6 {
-    color: #6C757D;
-    font-weight: 600;
-}
-
-.info-card h2 {
-    font-size: 35px;
-    color: #333333;
-    font-weight: bold;
-    margin-bottom: 0;
-}
-
-.danger {
-    color: #EE2A24 !important; /* Merah Peringatan */
-}
-
-/* SECTION TITLE & BUTTON */
-.section-title {
-    color: #004A8F;
-}
-
-.btn-brin {
-    background-color: #EE2A24; /* Merah BRIN */
-    color: white;
-    font-weight: bold;
-    border-radius: 8px;
-    padding: 10px 20px;
-    border: none;
-    transition: 0.3s;
-}
-
-.btn-brin:hover {
-    background-color: #C8231E;
-    color: white;
-}
-
-/* CHAMBER CARDS */
-.chamber-card {
-    background: #FFFFFF;
-    border-radius: 18px;
-    padding: 20px;
-    margin-bottom: 25px;
-    transition: 0.3s;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-    border: 1px solid #E5E7EB;
-}
-
-.chamber-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 30px rgba(0,0,0,0.1);
-}
-
-.title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    border-bottom: 2px solid #F3F4F6;
-    padding-bottom: 10px;
-}
-
-.title h4 {
-    color: #004A8F;
-    font-weight: bold;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-main);
     margin: 0;
 }
 
-.badge-online {
-    background: #D1FAE5;
-    color: #065F46;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-/* SENSOR LIST */
-.sensor {
-    font-size: 16px;
-    margin: 8px 0;
+.login-body {
+    background: linear-gradient(135deg, #004A8F, #4A90E2);
+    min-height: 100vh;
     display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid #F3F4F6;
-    padding-bottom: 5px;
-    color: #555;
-}
-
-.sensor b {
-    color: #004A8F;
-}
-
-/* DUMMY CHART PLACEHOLDER */
-.chart {
-    height: 60px;
-    background: linear-gradient(90deg, #004A8F, #4A90E2);
-    border-radius: 10px;
-    margin: 15px 0;
-    opacity: 0.8;
-}
-
-/* SWITCH KONTROL */
-.switch {
-    display: flex;
-    justify-content: space-between;
-    margin: 10px 0;
     align-items: center;
-    font-weight: 600;
-    color: #444;
+    justify-content: center;
 }
 
-.form-switch .form-check-input {
-    width: 2.5em;
-    height: 1.25em;
-    cursor: pointer;
+.login-container { width: 100%; max-width: 450px; padding: 20px; }
+.login-card {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
 }
 
-.form-switch .form-check-input:checked {
-    background-color: #EE2A24;
-    border-color: #EE2A24;
+/* DASHBOARD GLASSMORPHISM */
+.glass-body {
+    background: var(--bg-grad);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
 }
 
-.btn-detail {
-    width: 100%;
-    margin-top: 15px;
-    background-color: #004A8F;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
+/* SIDEBAR KIRI */
+.sidebar-pill {
+    width: 65px;
+    margin: 20px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 35px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    box-shadow: var(--shadow);
+}
+
+.logo-icon {
+    font-size: 24px;
+    color: var(--brin-blue);
+    margin-bottom: 30px;
+}
+
+.sidebar-pill a {
+    color: #64748b;
+    font-size: 20px;
+    margin: 15px 0;
+    text-decoration: none;
     transition: 0.3s;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
 }
 
-.btn-detail:hover {
-    background-color: #00366b;
+.sidebar-pill a.active, .sidebar-pill a:hover {
+    background: white;
+    color: var(--brin-blue);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
+
+.spacer { flex-grow: 1; }
+
+/* KONTEN UTAMA */
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 20px 20px 0;
+    height: 100vh;
+}
+
+/* TOP TOOLBAR */
+.top-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.pill {
+    background: var(--panel-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    padding: 8px 18px;
+    border-radius: 25px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: var(--shadow);
+    color: var(--text-main);
+}
+
+.pill-controls {
+    padding: 4px 12px;
+}
+
+.pill-dark {
+    background: #1e293b;
+    color: white;
+    border: none;
+}
+.pill-dark i { color: white; }
+
+.btn-icon {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--text-main);
+    padding: 5px;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.btn-icon:hover { background: rgba(0,0,0,0.05); }
+
+/* WORKSPACE (CHAMBER NODES) */
+.workspace {
+    flex-grow: 1;
+    display: flex;
+    gap: 30px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 10px 20px 10px;
+    align-items: center;
+}
+
+/* KARTU CHAMBER */
+.chamber-node {
+    min-width: 260px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid white;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.node-header {
+    background: #ffffff;
+    border-radius: 16px 16px 0 0;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.node-icon {
+    background: var(--brin-blue);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+.node-title {
+    font-weight: bold;
+    flex-grow: 1;
+    font-size: 13px;
+}
+
+.node-body {
+    padding: 12px;
+}
+
+.sensor-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: #64748b;
+}
+
+.sensor-row b { color: var(--text-main); font-size: 12px;}
+
+/* KONTROL PANEL MINI */
+.control-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #cbd5e1;
+}
+
+.ctrl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* SWITCH MINI */
+.switch-mini {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+}
+.switch-mini input { opacity: 0; width: 0; height: 0; }
+.slider-mini {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+.slider-mini:before {
+    position: absolute;
+    content: "";
+    height: 14px; width: 14px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+input:checked + .slider-mini { background-color: var(--brin-blue); }
+input:checked + .slider-mini:before { transform: translateX(14px); }
+
+/* TOMBOL SYRINGE MINI */
+.btn-group-tiny {
+    display: flex;
+    gap: 4px;
+}
+.btn-group-tiny button {
+    border: none;
+    background: #e2e8f0;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #475569;
+}
+.btn-group-tiny button:not(:disabled):hover {
+    background: var(--brin-blue);
+    color: white;
+}
+.btn-group-tiny button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* BOTTOM PANEL */
+.bottom-panel {
+    height: 210px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--panel-border);
+    border-radius: 25px;
+    box-shadow: var(--shadow);
+    display: flex;
+    padding: 15px 20px;
+    gap: 20px;
+}
+.panel-half {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.panel-half h6 { font-weight: bold; font-size: 14px; color: var(--text-main); margin-bottom: 10px; }

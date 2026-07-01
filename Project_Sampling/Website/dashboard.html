@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - IoT Sampling Tools</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="glass-body">
+
+    <!-- Floating Sidebar Kiri -->
+    <aside class="sidebar-pill">
+        <div class="logo-icon"><i class="bi bi-heptagon-fill"></i></div>
+        <a href="#" class="active" title="Dashboard"><i class="bi bi-house-door-fill"></i></a>
+        <a href="#" title="Settings"><i class="bi bi-sliders"></i></a>
+        <div class="spacer"></div>
+        <a href="#" onclick="logout()" title="Keluar"><i class="bi bi-box-arrow-right text-danger"></i></a>
+    </aside>
+
+    <main class="main-content">
+        <!-- Top Toolbar -->
+        <header class="top-toolbar">
+            
+            <div class="toolbar-group">
+                <div class="pill">
+                    <i class="bi bi-cpu text-primary"></i> IoT Sampling Tools
+                </div>
+                <div class="pill">
+                    <i class="bi bi-clock text-secondary"></i> <span id="clock">--:--</span>
+                </div>
+                <div class="pill">
+                    <span id="cuaca">Cek Suhu...</span>
+                </div>
+            </div>
+            
+            <div class="toolbar-group" id="operator-controls">
+                <div class="pill pill-controls">
+                    <button class="btn-icon" onclick="kurangiChamber()"><i class="bi bi-dash-lg"></i></button>
+                    <span class="mx-3 fw-bold"><span id="jumlahChamber">1</span> Chamber</span>
+                    <button class="btn-icon" onclick="tambahChamber()"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+
+            <div class="toolbar-group">
+                <div class="pill" title="User Aktif">
+                    <i class="bi bi-people-fill text-info"></i> <span id="active-users-count">1</span>
+                </div>
+                <div class="pill pill-dark">
+                    <i class="bi bi-person-circle"></i>
+                    <span id="display-username">Nama</span>
+                    <span class="badge bg-secondary ms-2" id="display-role">Role</span>
+                </div>
+            </div>
+
+        </header>
+
+        <!-- Area Kerja Utama (Flow/Cards) -->
+        <div class="workspace" id="containerChamber">
+            <!-- Chamber Nodes akan diisi oleh JS -->
+        </div>
+
+        <!-- Panel Bawah (Analytics) -->
+        <footer class="bottom-panel">
+            <div class="panel-half">
+                <h6><i class="bi bi-bar-chart-line-fill text-primary"></i> Grafik Suhu & Kelembapan Global</h6>
+                <div style="flex-grow: 1; position: relative;">
+                    <canvas id="globalChart"></canvas>
+                </div>
+            </div>
+            <div class="panel-half ps-4 border-start border-light border-2">
+                <h6><i class="bi bi-list-check text-success"></i> Service Overview</h6>
+                <div class="table-responsive">
+                    <table class="table table-borderless table-sm" style="font-size: 13px;">
+                        <thead>
+                            <tr class="text-muted">
+                                <th>Chamber</th>
+                                <th>Status Alat</th>
+                                <th>Terakhir Update</th>    
+                            </tr>
+                        </thead>
+                        <tbody id="overview-table">
+                            <tr><td>Chamber 1</td><td><span class="badge bg-success">Aman</span></td><td>Barusan</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- MODAL TAMBAH CHAMBER -->
+    <div class="modal fade" id="modalTambah" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: rgba(255,255,255,0.9); backdrop-filter: blur(15px); border-radius: 20px;">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-primary"><i class="bi bi-cpu"></i> Tambah Chamber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label text-secondary fw-bold">Masukkan ID Device / Chamber</label>
+                    <input type="text" id="inputChamberId" class="form-control" placeholder="Cth: Chamber 1" style="border-radius: 10px;">
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4" onclick="prosesTambahChamber()">Tambahkan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL CHAMBER -->
+    <div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(15px); border-radius: 20px;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" style="color: #004A8F;"><i class="bi bi-cpu"></i> Detail - <span id="detailChamberTitle"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-4">
+                        <!-- Kolom Kiri: Sensor Saat Ini -->
+                        <div class="col-lg-3 border-end">
+                            <h6 class="fw-bold mb-3 text-secondary">Nilai Sensor Terkini</h6>
+                            <div class="d-flex flex-column gap-3">
+                                <div class="p-3 bg-light rounded shadow-sm border">
+                                    <span class="text-muted small"><i class="bi bi-thermometer-half text-danger"></i> Suhu</span>
+                                    <h4 class="mb-0 fw-bold" id="detail-suhu">-- °C</h4>
+                                </div>
+                                <div class="p-3 bg-light rounded shadow-sm border">
+                                    <span class="text-muted small"><i class="bi bi-droplet-half text-primary"></i> Kelembapan</span>
+                                    <h4 class="mb-0 fw-bold" id="detail-kelembapan">-- %</h4>
+                                </div>
+                                <div class="p-3 bg-light rounded shadow-sm border">
+                                    <span class="text-muted small"><i class="bi bi-speedometer2 text-success"></i> Tekanan</span>
+                                    <h4 class="mb-0 fw-bold" id="detail-tekanan">-- hPa</h4>
+                                </div>
+                                <div class="p-3 bg-light rounded shadow-sm border">
+                                    <span class="text-muted small"><i class="bi bi-cloud-haze text-warning"></i> Metana</span>
+                                    <h4 class="mb-0 fw-bold" id="detail-metana">-- ppm</h4>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Kolom Kanan: Chart & Tabel -->
+                        <div class="col-lg-9">
+                            <h6 class="fw-bold mb-3 text-secondary">Grafik Histori Singkat</h6>
+                            <div style="height: 220px; margin-bottom: 25px;">
+                                <canvas id="historyChart"></canvas>
+                            </div>
+                            
+                            <h6 class="fw-bold mb-2 text-secondary">Log Activity (Database)</h6>
+                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border-radius: 10px; border: 1px solid #eee;">
+                                <table class="table table-hover table-sm text-center mb-0" style="font-size: 13px;">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>ID Data</th>
+                                            <th>Suhu (°C)</th>
+                                            <th>Lembap (%)</th>
+                                            <th>Tekanan (hPa)</th>
+                                            <th>Metana (ppm)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logTableBody">
+                                        <!-- Data diisi oleh JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>

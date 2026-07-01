@@ -28,6 +28,23 @@ db.connect((err) => {
         console.error('Gagal terkoneksi ke MySQL ❌', err.message);
     } else {
         console.log('Berhasil terhubung ke database MySQL! ✅');
+        
+        // Membuat tabel daftar_device otomatis jika belum ada
+        const createTableQuery = `
+            CREATE TABLE IF NOT EXISTS daftar_device (
+                chamber_id VARCHAR(50) PRIMARY KEY,
+                status VARCHAR(20) DEFAULT 'Offline',
+                last_seen DATETIME
+            )
+        `;
+        db.query(createTableQuery, (err) => {
+            if (err) console.error("Gagal membuat tabel daftar_device:", err.message);
+        });
+        
+        // Interval mengecek Offline (jika lebih dari 1 menit tidak kirim data)
+        setInterval(() => {
+            db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE");
+        }, 60000);
     }
 });
 
@@ -35,15 +52,20 @@ db.connect((err) => {
 // 2. POST /api/data (Sensor Data)
 // ==========================================
 app.post('/api/data', (req, res) => {
-    const { device, suhu, kelembaban, tekanan, gas_metana } = req.body;
+    const { device, suhu, kelembaban, tekanan, gas_metana, syringe_present } = req.body;
     
     if (!device || suhu === undefined) {
         return res.status(400).json({ status: "gagal", pesan: "Format data tidak valid" });
     }
 
-    const query = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana) VALUES (?, ?, ?, ?, ?, ?)';
+    // Registrasi/Update status device otomatis
+    const upsertDevice = `INSERT INTO daftar_device (chamber_id, status, last_seen) VALUES (?, 'Online', NOW()) 
+                          ON DUPLICATE KEY UPDATE status='Online', last_seen=NOW()`;
+    db.query(upsertDevice, [device]);
+
+    const query = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana, syringe_present) VALUES (?, ?, ?, ?, ?, ?, ?)';
     
-    db.query(query, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana], (err, results) => {
+    db.query(query, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana, syringe_present || 0], (err, results) => {
         if (err) {
             console.error('\n[❌] Gagal menyimpan ke MySQL:', err.message);
             return res.status(500).json({ status: "gagal", pesan: err.message });
@@ -58,12 +80,12 @@ app.post('/api/data', (req, res) => {
 });
 
 // ==========================================
-// 3. GET /api/data/latest (Ambil Data Terbaru)
+// 3. GET /api/data/latest/:device (Ambil Data Terbaru Spesifik Device)
 // ==========================================
-app.get('/api/data/latest', (req, res) => {
-    const query = 'SELECT * FROM sensor_data ORDER BY id DESC LIMIT 1';
+app.get('/api/data/latest/:device', (req, res) => {
+    const query = 'SELECT * FROM sensor_data WHERE nama_device = ? ORDER BY id DESC LIMIT 1';
     
-    db.query(query, (err, results) => {
+    db.query(query, [req.params.device], (err, results) => {
         if (err) {
             console.error('\n[❌] Gagal mengambil data terbaru:', err.message);
             return res.status(500).json({ status: "gagal", pesan: err.message });
@@ -74,6 +96,27 @@ app.get('/api/data/latest', (req, res) => {
         } else {
             res.json({ status: "berhasil", data: null, pesan: "Data masih kosong" });
         }
+    });
+});
+
+// ==========================================
+// API GET DEVICES (Untuk mengecek ketersediaan & status)
+// ==========================================
+app.get('/api/devices', (req, res) => {
+    db.query('SELECT * FROM daftar_device', (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", data: results });
+    });
+});
+
+// ==========================================
+// API GET HISTORY (Untuk Log Activity)
+// ==========================================
+app.get('/api/data/history/:device', (req, res) => {
+    const query = 'SELECT * FROM sensor_data WHERE nama_device = ? ORDER BY id DESC LIMIT 30';
+    db.query(query, [req.params.device], (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", data: results });
     });
 });
 
