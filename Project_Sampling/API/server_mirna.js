@@ -27,13 +27,25 @@ db.connect((err) => {
 // 2. POST /api/data (Sensor Data)
 // ==========================================
 app.post('/api/data', (req, res) => {
-    const { suhu, kelembaban, gas_metana } = req.body;
-    if (!suhu || !kelembaban || !gas_metana) return res.status(400).json({ status: "gagal" });
+    const { device, suhu, kelembaban, tekanan, gas_metana } = req.body;
+    
+    if (!device || suhu === undefined) {
+        return res.status(400).json({ status: "gagal", pesan: "Format data tidak valid" });
+    }
 
-    const query = 'INSERT INTO sensor_data (suhu, kelembaban, gas_metana) VALUES (?, ?, ?)';
-    db.query(query, [suhu, kelembaban, gas_metana], (err, results) => {
-        if (err) return res.status(500).json({ status: "gagal" });
-        res.json({ status: "berhasil", id: results.insertId });
+    const query = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana) VALUES (?, ?, ?, ?, ?, ?)';
+    
+    db.query(query, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana], (err, results) => {
+        if (err) {
+            console.error('\n[❌] Gagal menyimpan ke MySQL:', err.message);
+            return res.status(500).json({ status: "gagal", pesan: err.message });
+        }
+        
+        console.log(`\n[✅] Data berhasil masuk dari device: ${device}`);
+        console.log(`     - Suhu: ${suhu} | Kelembaban: ${kelembaban} | Tekanan: ${tekanan} | Gas: ${gas_metana}`);
+        console.log('-'.repeat(60));
+        
+        res.json({ status: "berhasil", pesan: "Data tersimpan" });
     });
 });
 
@@ -67,6 +79,6 @@ app.post('/api/commands', (req, res) => {
 // ==========================================
 // 4. MENYALAKAN SERVER
 // ==========================================
-app.listen(port, () => {
-    console.log(`Server berjalan di http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server berjalan di http://0.0.0.0:${port} (Menerima koneksi dari semua IP)`);
 });
