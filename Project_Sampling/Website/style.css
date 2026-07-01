@@ -1,0 +1,198 @@
+/* TEMA BRIN: Putih, Abu-abu Muda, Merah BRIN, Biru Gelap */
+
+body {
+    background: #F4F6F9; /* Abu-abu muda khas dashboard terang */
+    color: #333333;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* NAVBAR */
+.navbar {
+    background: #FFFFFF;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    border-bottom: 4px solid #EE2A24; /* Aksen Merah BRIN di bawah header */
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: #004A8F; /* Biru BRIN */
+}
+
+.logo i {
+    color: #EE2A24; /* Ikon Merah BRIN */
+}
+
+.status {
+    font-weight: bold;
+    color: #004A8F;
+}
+
+.online-dot {
+    height: 12px;
+    width: 12px;
+    background: #10B981; /* Hijau Online */
+    display: inline-block;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    100% { box-shadow: 0 0 0 12px transparent; }
+}
+
+/* INFO CARDS (Top 4 Cards) */
+.info-card {
+    background: #FFFFFF;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+    transition: 0.3s;
+    border-left: 5px solid #004A8F; /* Garis aksen biru */
+}
+
+.info-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
+
+.info-card h6 {
+    color: #6C757D;
+    font-weight: 600;
+}
+
+.info-card h2 {
+    font-size: 35px;
+    color: #333333;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.danger {
+    color: #EE2A24 !important; /* Merah Peringatan */
+}
+
+/* SECTION TITLE & BUTTON */
+.section-title {
+    color: #004A8F;
+}
+
+.btn-brin {
+    background-color: #EE2A24; /* Merah BRIN */
+    color: white;
+    font-weight: bold;
+    border-radius: 8px;
+    padding: 10px 20px;
+    border: none;
+    transition: 0.3s;
+}
+
+.btn-brin:hover {
+    background-color: #C8231E;
+    color: white;
+}
+
+/* CHAMBER CARDS */
+.chamber-card {
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 25px;
+    transition: 0.3s;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    border: 1px solid #E5E7EB;
+}
+
+.chamber-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+}
+
+.title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #F3F4F6;
+    padding-bottom: 10px;
+}
+
+.title h4 {
+    color: #004A8F;
+    font-weight: bold;
+    margin: 0;
+}
+
+.badge-online {
+    background: #D1FAE5;
+    color: #065F46;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* SENSOR LIST */
+.sensor {
+    font-size: 16px;
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #F3F4F6;
+    padding-bottom: 5px;
+    color: #555;
+}
+
+.sensor b {
+    color: #004A8F;
+}
+
+/* DUMMY CHART PLACEHOLDER */
+.chart {
+    height: 60px;
+    background: linear-gradient(90deg, #004A8F, #4A90E2);
+    border-radius: 10px;
+    margin: 15px 0;
+    opacity: 0.8;
+}
+
+/* SWITCH KONTROL */
+.switch {
+    display: flex;
+    justify-content: space-between;
+    margin: 10px 0;
+    align-items: center;
+    font-weight: 600;
+    color: #444;
+}
+
+.form-switch .form-check-input {
+    width: 2.5em;
+    height: 1.25em;
+    cursor: pointer;
+}
+
+.form-switch .form-check-input:checked {
+    background-color: #EE2A24;
+    border-color: #EE2A24;
+}
+
+.btn-detail {
+    width: 100%;
+    margin-top: 15px;
+    background-color: #004A8F;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.btn-detail:hover {
+    background-color: #00366b;
+}
