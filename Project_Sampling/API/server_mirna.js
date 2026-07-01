@@ -9,7 +9,7 @@ app.use(express.json());
 // 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA)
 // ==========================================
 const db = mysql.createConnection({
-    host: '10.5.24.253', 
+    host: '10.40.87.115', 
     user: 'root',      
     password: 'root123',      
     database: 'iot_padi' 
