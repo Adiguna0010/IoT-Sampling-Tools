@@ -50,7 +50,27 @@ app.post('/api/data', (req, res) => {
 });
 
 // ==========================================
-// 3. POST /api/commands (Data Array Mirza + Konversi Tanggal)
+// 3. GET /api/data/latest (Ambil Data Terbaru)
+// ==========================================
+app.get('/api/data/latest', (req, res) => {
+    const query = 'SELECT * FROM sensor_data ORDER BY id DESC LIMIT 1';
+    
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('\n[❌] Gagal mengambil data terbaru:', err.message);
+            return res.status(500).json({ status: "gagal", pesan: err.message });
+        }
+        
+        if (results.length > 0) {
+            res.json({ status: "berhasil", data: results[0] });
+        } else {
+            res.json({ status: "berhasil", data: null, pesan: "Data masih kosong" });
+        }
+    });
+});
+
+// ==========================================
+// 4. POST /api/commands (Data Array Mirza + Konversi Tanggal)
 // ==========================================
 app.post('/api/commands', (req, res) => {
     const dataCommands = req.body;
