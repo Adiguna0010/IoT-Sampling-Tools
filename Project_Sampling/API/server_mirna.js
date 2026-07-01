@@ -45,8 +45,10 @@ app.post('/api/commands', (req, res) => {
     if (!Array.isArray(dataCommands)) return res.status(400).json({ status: "gagal" });
 
     const promises = dataCommands.map(item => {
-        // Konversi format tanggal menjadi YYYY-MM-DD HH:MM:SS
-        const formattedDate = new Date(item.created_at).toISOString().slice(0, 19).replace('T', ' ');
+        // Konversi format tanggal menjadi YYYY-MM-DD HH:MM:SS dengan zona waktu lokal
+        const dateValue = item.created_at ? new Date(item.created_at) : new Date();
+        const tzoffset = dateValue.getTimezoneOffset() * 60000; // offset zona waktu dalam milidetik
+        const formattedDate = new Date(dateValue.getTime() - tzoffset).toISOString().slice(0, 19).replace('T', ' ');
 
         const query = 'INSERT INTO commands (chamber_id, command_name, command_value, created_at) VALUES (?, ?, ?, ?)';
         return new Promise((resolve, reject) => {
