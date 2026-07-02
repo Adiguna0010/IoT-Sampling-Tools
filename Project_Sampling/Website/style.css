@@ -92,6 +92,8 @@ body {
     flex-direction: column;
     padding: 20px 20px 20px 0;
     height: 100vh;
+    min-width: 0;
+    overflow: hidden;
 }
 
 /* TOP TOOLBAR */
@@ -159,14 +161,39 @@ body {
 
 /* KARTU CHAMBER */
 .chamber-node {
-    min-width: 260px;
+    flex: 0 0 auto;
+    min-width: 280px;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(10px);
     border: 1px solid white;
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.3s;
+}
+
+/* Custom Scrollbar for Horizontal Card Deck */
+.custom-scrollbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    padding-bottom: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar {
+    height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
 }
 
 .node-header {

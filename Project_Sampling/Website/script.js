@@ -173,14 +173,35 @@ async function prosesTambahChamber() {
     }
 }
 
-// Kurangi Chamber (menghapus yang paling akhir ditambahkan)
+// Membuka Modal Kurangi Chamber
 function kurangiChamber() {
-    if (activeChambers.length > 1) {
-        activeChambers.pop();
+    if (activeChambers.length <= 1) {
+        alert("Minimal 1 Chamber harus tampil!");
+        return;
+    }
+    
+    const select = document.getElementById("inputKurangiChamber");
+    select.innerHTML = "";
+    activeChambers.forEach(ch => {
+        const opt = document.createElement("option");
+        opt.value = ch;
+        opt.innerText = ch;
+        select.appendChild(opt);
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalKurangi'));
+    modal.show();
+}
+
+// Proses Eksekusi Kurangi Chamber
+function prosesKurangiChamber() {
+    const selected = document.getElementById("inputKurangiChamber").value;
+    if (selected) {
+        activeChambers = activeChambers.filter(ch => ch !== selected);
         localStorage.setItem('savedChambers', JSON.stringify(activeChambers));
         load();
-    } else {
-        alert("Minimal 1 Chamber harus tampil!");
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalKurangi')).hide();
     }
 }
 

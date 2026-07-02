@@ -68,7 +68,7 @@
         </header>
 
         <!-- Area Kerja Utama (Flow/Cards) -->
-        <div class="workspace" id="containerChamber">
+        <div class="workspace d-flex flex-nowrap custom-scrollbar pb-3 mb-3" id="containerChamber">
             <!-- Chamber Nodes akan diisi oleh JS -->
         </div>
 
@@ -100,21 +100,42 @@
         </footer>
     </main>
 
-    <!-- MODAL TAMBAH CHAMBER -->
-    <div class="modal fade" id="modalTambah" tabindex="-1" aria-hidden="true">
+    <!-- Modal Tambah Chamber -->
+    <div class="modal fade" id="modalTambah" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="background: rgba(255,255,255,0.9); backdrop-filter: blur(15px); border-radius: 20px;">
-                <div class="modal-header border-0">
-                    <h5 class="modal-title fw-bold text-primary"><i class="bi bi-cpu"></i> Tambah Chamber</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-square text-primary"></i> Tambah Chamber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <label class="form-label text-secondary fw-bold">Masukkan ID Device / Chamber</label>
-                    <input type="text" id="inputChamberId" class="form-control" placeholder="Cth: Chamber 1" style="border-radius: 10px;">
+                    <label class="form-label">Masukkan ID / Nama Chamber:</label>
+                    <input type="text" class="form-control" id="inputChamberId" placeholder="Misal: Chamber 2">
+                    <div id="error-tambah" class="text-danger small mt-2" style="display: none;"></div>
                 </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-primary rounded-pill px-4" onclick="prosesTambahChamber()">Tambahkan</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="prosesTambahChamber()">Tambah</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Kurangi Chamber -->
+    <div class="modal fade" id="modalKurangi" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-dash-square text-danger"></i> Kurangi Chamber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Pilih Chamber yang ingin disembunyikan:</label>
+                    <select class="form-select" id="inputKurangiChamber"></select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger" onclick="prosesKurangiChamber()">Hapus</button>
                 </div>
             </div>
         </div>
