@@ -74,7 +74,20 @@
         <!-- Panel Bawah (Analytics) -->
         <footer class="bottom-panel">
             <div class="panel-half">
-                <h6><i class="bi bi-bar-chart-line-fill text-primary"></i> Grafik Suhu & Kelembapan Global</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="bi bi-bar-chart-line-fill text-primary"></i> Grafik Global (Chamber 1)</h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light border dropdown-toggle py-0" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="font-size: 11px;">
+                            <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2 shadow-sm" style="font-size: 12px;">
+                            <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="0" id="gchkSuhu" checked onchange="updateGlobalChartVisibility()"><label class="form-check-label text-danger fw-bold" for="gchkSuhu">Suhu</label></div></li>
+                            <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="1" id="gchkLembap" checked onchange="updateGlobalChartVisibility()"><label class="form-check-label text-primary fw-bold" for="gchkLembap">Kelembapan</label></div></li>
+                            <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="2" id="gchkTekanan" onchange="updateGlobalChartVisibility()"><label class="form-check-label text-success fw-bold" for="gchkTekanan">Tekanan</label></div></li>
+                            <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="3" id="gchkMetana" onchange="updateGlobalChartVisibility()"><label class="form-check-label text-warning fw-bold" for="gchkMetana">Metana</label></div></li>
+                        </ul>
+                    </div>
+                </div>
                 <div style="flex-grow: 1; position: relative;">
                     <canvas id="globalChart"></canvas>
                 </div>
@@ -152,23 +165,23 @@
                     <div class="row g-4">
                         <!-- Kolom Kiri: Sensor Saat Ini -->
                         <div class="col-lg-3 border-end">
-                            <h6 class="fw-bold mb-3 text-secondary">Nilai Sensor Terkini</h6>
-                            <div class="d-flex flex-column gap-3">
-                                <div class="p-3 bg-light rounded shadow-sm border">
+                            <h6 class="fw-bold mb-2 text-secondary">Nilai Sensor</h6>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
                                     <span class="text-muted small"><i class="bi bi-thermometer-half text-danger"></i> Suhu</span>
-                                    <h4 class="mb-0 fw-bold" id="detail-suhu">-- °C</h4>
+                                    <h5 class="mb-0 fw-bold" id="detail-suhu">-- °C</h5>
                                 </div>
-                                <div class="p-3 bg-light rounded shadow-sm border">
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
                                     <span class="text-muted small"><i class="bi bi-droplet-half text-primary"></i> Kelembapan</span>
-                                    <h4 class="mb-0 fw-bold" id="detail-kelembapan">-- %</h4>
+                                    <h5 class="mb-0 fw-bold" id="detail-kelembapan">-- %</h5>
                                 </div>
-                                <div class="p-3 bg-light rounded shadow-sm border">
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
                                     <span class="text-muted small"><i class="bi bi-speedometer2 text-success"></i> Tekanan</span>
-                                    <h4 class="mb-0 fw-bold" id="detail-tekanan">-- hPa</h4>
+                                    <h5 class="mb-0 fw-bold" id="detail-tekanan">-- hPa</h5>
                                 </div>
-                                <div class="p-3 bg-light rounded shadow-sm border">
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
                                     <span class="text-muted small"><i class="bi bi-cloud-haze text-warning"></i> Metana</span>
-                                    <h4 class="mb-0 fw-bold" id="detail-metana">-- ppm</h4>
+                                    <h5 class="mb-0 fw-bold" id="detail-metana">-- ppm</h5>
                                 </div>
                             </div>
 
@@ -208,36 +221,11 @@
                                 
                                 <!-- Mode Otomatis -->
                                 <div class="tab-pane fade" id="panel-otomatis" role="tabpanel">
-                                    <div class="p-2 bg-light rounded border mb-2">
-                                        <form id="form-jadwal" onsubmit="tambahJadwal(event)">
-                                            <div class="row g-1 align-items-center">
-                                                <div class="col-5">
-                                                    <select class="form-select form-select-sm" id="jadwal-alat" required style="font-size: 11px;">
-                                                        <option value="Kipas-1">Kipas ON</option>
-                                                        <option value="Kipas-0">Kipas OFF</option>
-                                                        <option value="Syringe-U">Syringe UP</option>
-                                                        <option value="Syringe-D">Syringe DWN</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-4">
-                                                    <input type="time" class="form-control form-control-sm" id="jadwal-waktu" required style="font-size: 11px;">
-                                                </div>
-                                                <div class="col-3 text-end">
-                                                    <button type="submit" class="btn btn-primary btn-sm w-100" style="font-size: 11px;"><i class="bi bi-plus"></i> Set</button>
-                                                </div>
-                                            </div>
-                                        </form>
-                                    </div>
-                                    
-                                    <div class="table-responsive border rounded" style="max-height: 120px; overflow-y: auto;">
-                                        <table class="table table-sm table-hover text-center mb-0" style="font-size: 10px;">
-                                            <thead class="table-light sticky-top">
-                                                <tr><th>Aksi</th><th>Waktu</th><th>Hapus</th></tr>
-                                            </thead>
-                                            <tbody id="list-jadwal">
-                                                <tr><td colspan="3">Tidak ada jadwal</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <div class="text-center p-3 border rounded bg-white shadow-sm mt-2">
+                                        <p class="small text-muted mb-3">Atur jadwal presisi untuk otomatisasi Kipas dan Syringe tanpa intervensi manual.</p>
+                                        <button class="btn btn-primary btn-sm w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#modalJadwal">
+                                            <i class="bi bi-calendar-plus"></i> Buka Editor Jadwal
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -246,7 +234,40 @@
                         
                         <!-- Kolom Kanan: Chart & Tabel -->
                         <div class="col-lg-9">
-                            <h6 class="fw-bold mb-3 text-secondary">Grafik Histori Singkat</h6>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold mb-0 text-secondary">Grafik History</h6>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                        <i class="bi bi-funnel"></i> Filter Grafik
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end p-2 shadow" style="font-size: 13px;">
+                                        <li>
+                                            <div class="form-check">
+                                                <input class="form-check-input chart-filter" type="checkbox" value="0" id="chkSuhu" checked onchange="updateChartVisibility()">
+                                                <label class="form-check-label text-danger fw-bold" for="chkSuhu">Suhu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="form-check">
+                                                <input class="form-check-input chart-filter" type="checkbox" value="1" id="chkLembap" checked onchange="updateChartVisibility()">
+                                                <label class="form-check-label text-primary fw-bold" for="chkLembap">Kelembapan</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="form-check">
+                                                <input class="form-check-input chart-filter" type="checkbox" value="2" id="chkTekanan" checked onchange="updateChartVisibility()">
+                                                <label class="form-check-label text-success fw-bold" for="chkTekanan">Tekanan</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="form-check">
+                                                <input class="form-check-input chart-filter" type="checkbox" value="3" id="chkMetana" checked onchange="updateChartVisibility()">
+                                                <label class="form-check-label text-warning fw-bold" for="chkMetana">Metana</label>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
                             <div style="height: 220px; margin-bottom: 25px;">
                                 <canvas id="historyChart"></canvas>
                             </div>
@@ -258,7 +279,7 @@
                                         <tr>
                                             <th>ID Data</th>
                                             <th>Suhu (°C)</th>
-                                            <th>Lembap (%)</th>
+                                            <th>Kelembapan (%)</th>
                                             <th>Tekanan (hPa)</th>
                                             <th>Metana (ppm)</th>
                                         </tr>
@@ -390,6 +411,56 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- MODAL ATUR JADWAL OTOMATIS -->
+    <div class="modal fade" id="modalJadwal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 15px;">
+                <div class="modal-header bg-light border-bottom-0 pb-2">
+                    <h5 class="modal-title fw-bold text-secondary"><i class="bi bi-calendar-check text-primary"></i> Editor Jadwal Otomatis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="form-jadwal" onsubmit="tambahJadwal(event)">
+                        <div class="row g-2 align-items-end mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted mb-1">Aksi Perangkat</label>
+                                <select class="form-select" id="jadwal-alat" required>
+                                    <option value="Kipas-1">Nyalakan Kipas (ON)</option>
+                                    <option value="Kipas-0">Matikan Kipas (OFF)</option>
+                                    <option value="Syringe-U">Tarik Syringe (UP)</option>
+                                    <option value="Syringe-D">Turunkan Syringe (DWN)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted mb-1">Waktu (HH:MM)</label>
+                                <input type="time" class="form-control" id="jadwal-waktu" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <h6 class="fw-bold mb-2 text-secondary small">Daftar Jadwal Aktif</h6>
+                    <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-hover align-middle text-center mb-0" style="font-size: 14px;">
+                            <thead class="table-light sticky-top">
+                                <tr><th>Perintah Aksi</th><th>Waktu Eksekusi</th><th>Hapus</th></tr>
+                            </thead>
+                            <tbody id="list-jadwal">
+                                <tr><td colspan="3" class="text-muted py-3">Tidak ada jadwal tersimpan.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 text-end">
+                        <button type="button" class="btn btn-success px-4 fw-bold" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalDetail"><i class="bi bi-check2-circle"></i> Selesai (Done)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

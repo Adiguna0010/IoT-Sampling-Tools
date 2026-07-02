@@ -265,17 +265,33 @@ async function bukaDetail(chamberId) {
         const resHistory = await fetch(`http://localhost:3000/api/data/history/${chamberId}`);
         const jsonHistory = await resHistory.json();
         
-        if (jsonHistory.status === "berhasil" && jsonHistory.data.length > 0) {
+        if(jsonHistory.status === "berhasil" && jsonHistory.data.length > 0) {
             let html = "";
             let labels = [];
             let suhuData = [];
             let humData = [];
+            let tekData = [];
+            let metanaData = [];
+            
+            // Render dari bawah agar grafik dari kiri ke kanan (Waktu terlama -> terbaru)
+            const reversedData = [...jsonHistory.data].reverse();
+            reversedData.forEach(d => {
+                const time = new Date(d.created_at).toLocaleTimeString();
+                labels.push(time);
+                suhuData.push(d.suhu);
+                humData.push(d.kelembaban);
+                tekData.push(d.tekanan);
+                metanaData.push(d.gas_metana);
+            });
             
             jsonHistory.data.forEach(d => {
-                html += `<tr><td>${d.id}</td><td>${d.suhu}</td><td>${d.kelembaban}</td><td>${d.tekanan}</td><td>${d.gas_metana}</td></tr>`;
-                labels.unshift(d.id); 
-                suhuData.unshift(d.suhu);
-                humData.unshift(d.kelembaban);
+                html += `<tr>
+                    <td>#${d.id}</td>
+                    <td>${d.suhu}</td>
+                    <td>${d.kelembaban}</td>
+                    <td>${d.tekanan}</td>
+                    <td>${d.gas_metana}</td>
+                </tr>`;
             });
             document.getElementById("logTableBody").innerHTML = html;
             
@@ -286,12 +302,22 @@ async function bukaDetail(chamberId) {
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Suhu (°C)', data: suhuData, borderColor: '#EE2A24', tension: 0.3, fill: true, backgroundColor: 'rgba(238, 42, 36, 0.1)' },
-                        { label: 'Kelembapan (%)', data: humData, borderColor: '#004A8F', tension: 0.3 }
+                        { label: 'Suhu (°C)', data: suhuData, borderColor: '#dc3545', tension: 0.3, fill: false },
+                        { label: 'Kelembapan (%)', data: humData, borderColor: '#0d6efd', tension: 0.3, fill: false },
+                        { label: 'Tekanan (hPa)', data: tekData, borderColor: '#198754', tension: 0.3, fill: false, hidden: false },
+                        { label: 'Metana (ppm)', data: metanaData, borderColor: '#ffc107', tension: 0.3, fill: false, hidden: false }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false } // Sembunyikan legend bawaan, pakai dropdown
+                    }
+                }
             });
+            // Update checkbox visibility sesuai status grafik
+            updateChartVisibility();
         } else {
             document.getElementById("logTableBody").innerHTML = `<tr><td colspan="5">Tidak ada riwayat data ditemukan.</td></tr>`;
         }
@@ -443,99 +469,179 @@ function initChart() {
         data: {
             labels: [],
             datasets: [
-                { label: 'Suhu (°C)', borderColor: '#EE2A24', data: [], tension: 0.3 },
-                { label: 'Lembap (%)', borderColor: '#0f62fe', data: [], tension: 0.3 }
+                { label: 'Suhu (°C)', data: [], borderColor: '#dc3545', tension: 0.3, fill: false },
+                { label: 'Kelembapan (%)', data: [], borderColor: '#0d6efd', tension: 0.3, fill: false },
+                { label: 'Tekanan (hPa)', data: [], borderColor: '#198754', tension: 0.3, fill: false, hidden: true },
+                { label: 'Metana (ppm)', data: [], borderColor: '#ffc107', tension: 0.3, fill: false, hidden: true }
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            scales: { x: { display: false }, y: { display: true } },
-            plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: {size: 10} } } }
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: false }
+            }
         }
     });
+}
+
+function updateGlobalChartVisibility() {
+    if(!myChart) return;
+    const checkboxes = document.querySelectorAll('.chart-checkbox');
+    checkboxes.forEach((cb) => {
+        const datasetIndex = cb.getAttribute('data-index');
+        myChart.data.datasets[datasetIndex].hidden = !cb.checked;
+    });
+    myChart.update();
 }
 
 async function fetchData() {
     // Perbarui status koneksi device juga setiap cycle
     updateOverviewTable();
 
-    // Loop semua chamber yang tampil di layar dan ambil data terbarunya masing-masing
-    activeChambers.forEach(async (chamberId) => {
+    let sumSuhu = 0, sumLembap = 0, sumTekanan = 0, sumMetana = 0;
+    let countValidData = 0;
+
+    // Ambil data untuk semua chamber aktif secara paralel
+    const fetchPromises = activeChambers.map(async (chamberId) => {
         const safeId = chamberId.replace(/\s+/g, '-');
-        
         try {
             const response = await fetch(`http://localhost:3000/api/data/latest/${chamberId}`);
             const result = await response.json();
+            return { chamberId, safeId, result };
+        } catch (error) {
+            console.error(`Gagal mengambil data ${chamberId}:`, error);
+            return { chamberId, safeId, result: null };
+        }
+    });
 
-            if (result.status === "berhasil" && result.data) {
-                const data = result.data;
+    const results = await Promise.all(fetchPromises);
+
+    results.forEach(({ chamberId, safeId, result }) => {
+        if (result && result.status === "berhasil" && result.data) {
+            const data = result.data;
+            
+            // Tambahkan ke kalkulasi rata-rata global
+            sumSuhu += parseFloat(data.suhu) || 0;
+            sumLembap += parseFloat(data.kelembaban) || 0;
+            sumTekanan += parseFloat(data.tekanan) || 0;
+            sumMetana += parseFloat(data.gas_metana) || 0;
+            countValidData++;
+            
+            if(document.getElementById(`suhu-${safeId}`)) {
+                document.getElementById(`suhu-${safeId}`).innerText = `${data.suhu} °C`;
+                document.getElementById(`kelembapan-${safeId}`).innerText = `${data.kelembaban} %`;
+                document.getElementById(`tekanan-${safeId}`).innerText = `${data.tekanan} hPa`;
+                document.getElementById(`metana-${safeId}`).innerText = `${data.gas_metana} ppm`;
                 
-                if(document.getElementById(`suhu-${safeId}`)) {
-                    document.getElementById(`suhu-${safeId}`).innerText = `${data.suhu} °C`;
-                    document.getElementById(`kelembapan-${safeId}`).innerText = `${data.kelembaban} %`;
-                    document.getElementById(`tekanan-${safeId}`).innerText = `${data.tekanan} hPa`;
-                    document.getElementById(`metana-${safeId}`).innerText = `${data.gas_metana} ppm`;
-                    
-                    // Update Grafik Global (Hanya mengambil data dari Chamber 1 sebagai sample global)
-                    if(chamberId === activeChambers[0] && myChart) {
-                        const time = new Date().toLocaleTimeString();
-                        myChart.data.labels.push(time);
-                        myChart.data.datasets[0].data.push(data.suhu);
-                        myChart.data.datasets[1].data.push(data.kelembaban);
-                        if(myChart.data.labels.length > 10) {
-                            myChart.data.labels.shift();
-                            myChart.data.datasets[0].data.shift();
-                            myChart.data.datasets[1].data.shift();
+                if (userRole !== "user") {
+                    let isPresent = data.syringe_present || 0; 
+                    const presenceBadge = document.getElementById(`syringe-presence-${safeId}`);
+                    const btnUp = document.getElementById(`btn-up-${safeId}`);
+                    const btnDown = document.getElementById(`btn-down-${safeId}`);
+
+                    if (presenceBadge && btnUp && btnDown) {
+                        if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                            presenceBadge.innerText = "Siap";
+                            presenceBadge.className = "badge bg-success";
+                            btnUp.disabled = false;
+                            btnDown.disabled = false;
+                        } else {
+                            presenceBadge.innerText = "Kosong";
+                            presenceBadge.className = "badge bg-danger";
+                            btnUp.disabled = true;
+                            btnDown.disabled = true;
                         }
-                        myChart.update();
                     }
                     
-                    if (userRole !== "user") {
-                        let isPresent = data.syringe_present || 0; 
-                        const presenceBadge = document.getElementById(`syringe-presence-${safeId}`);
-                        const btnUp = document.getElementById(`btn-up-${safeId}`);
-                        const btnDown = document.getElementById(`btn-down-${safeId}`);
-
-                        if (presenceBadge && btnUp && btnDown) {
-                            if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
-                                presenceBadge.innerText = "Siap";
-                                presenceBadge.className = "badge bg-success";
-                                btnUp.disabled = false;
-                                btnDown.disabled = false;
-                            } else {
-                                presenceBadge.innerText = "Kosong";
-                                presenceBadge.className = "badge bg-danger";
-                                btnUp.disabled = true;
-                                btnDown.disabled = true;
+                    // Update status di Modal Detail (jika sedang terbuka)
+                    if (currentDetailChamber === chamberId) {
+                        if(document.getElementById('detail-suhu')) {
+                            document.getElementById('detail-suhu').innerText = `${data.suhu} °C`;
+                            document.getElementById('detail-kelembapan').innerText = `${data.kelembaban} %`;
+                            document.getElementById('detail-tekanan').innerText = `${data.tekanan} hPa`;
+                            document.getElementById('detail-metana').innerText = `${data.gas_metana} ppm`;
+                            
+                            // Update Grafik History secara real-time
+                            if (historyChartInstance) {
+                                const time = new Date().toLocaleTimeString();
+                                historyChartInstance.data.labels.push(time);
+                                historyChartInstance.data.datasets[0].data.push(data.suhu);
+                                historyChartInstance.data.datasets[1].data.push(data.kelembaban);
+                                historyChartInstance.data.datasets[2].data.push(data.tekanan);
+                                historyChartInstance.data.datasets[3].data.push(data.gas_metana);
+                                
+                                // Geser grafik jika kepanjangan
+                                if(historyChartInstance.data.labels.length > 50) {
+                                    historyChartInstance.data.labels.shift();
+                                    historyChartInstance.data.datasets.forEach(dataset => dataset.data.shift());
+                                }
+                                historyChartInstance.update();
+                            }
+                            
+                            // Update Tabel Log secara real-time
+                            const logTableBody = document.getElementById("logTableBody");
+                            if (logTableBody) {
+                                const newRow = document.createElement("tr");
+                                newRow.innerHTML = `
+                                    <td>#${data.id || '?'}</td>
+                                    <td>${data.suhu}</td>
+                                    <td>${data.kelembaban}</td>
+                                    <td>${data.tekanan}</td>
+                                    <td>${data.gas_metana}</td>
+                                `;
+                                logTableBody.insertBefore(newRow, logTableBody.firstChild);
+                                if (logTableBody.children.length > 30) {
+                                    logTableBody.removeChild(logTableBody.lastChild);
+                                }
                             }
                         }
                         
-                        // Update status di Modal Detail (jika sedang terbuka)
-                        if (currentDetailChamber === chamberId) {
-                            const detailBadge = document.getElementById("detail-ctrl-badge");
-                            const dBtnUp = document.getElementById("detail-btn-up");
-                            const dBtnDown = document.getElementById("detail-btn-down");
-                            if (detailBadge && dBtnUp && dBtnDown) {
-                                if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
-                                    detailBadge.innerText = "Syringe Siap";
-                                    detailBadge.className = "badge bg-success ms-1";
-                                    dBtnUp.disabled = false;
-                                    dBtnDown.disabled = false;
-                                } else {
-                                    detailBadge.innerText = "Syringe Kosong";
-                                    detailBadge.className = "badge bg-danger ms-1";
-                                    dBtnUp.disabled = true;
-                                    dBtnDown.disabled = true;
-                                }
+                        const detailBadge = document.getElementById("detail-ctrl-badge");
+                        const dBtnUp = document.getElementById("detail-btn-up");
+                        const dBtnDown = document.getElementById("detail-btn-down");
+                        if (detailBadge && dBtnUp && dBtnDown) {
+                            if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                                detailBadge.innerText = "Syringe Siap";
+                                detailBadge.className = "badge bg-success ms-1";
+                                dBtnUp.disabled = false;
+                                dBtnDown.disabled = false;
+                            } else {
+                                detailBadge.innerText = "Syringe Kosong";
+                                detailBadge.className = "badge bg-danger ms-1";
+                                dBtnUp.disabled = true;
+                                dBtnDown.disabled = true;
                             }
                         }
                     }
                 }
             }
-        } catch (error) {
-            console.error(`Gagal mengambil data ${chamberId}:`, error);
         }
     });
+
+    // Update Global Chart dengan rata-rata dari semua Chamber Aktif
+    if (countValidData > 0 && myChart) {
+        const avgSuhu = (sumSuhu / countValidData).toFixed(2);
+        const avgLembap = (sumLembap / countValidData).toFixed(2);
+        const avgTekanan = (sumTekanan / countValidData).toFixed(2);
+        const avgMetana = (sumMetana / countValidData).toFixed(2);
+
+        const time = new Date().toLocaleTimeString();
+        myChart.data.labels.push(time);
+        myChart.data.datasets[0].data.push(avgSuhu);
+        myChart.data.datasets[1].data.push(avgLembap);
+        myChart.data.datasets[2].data.push(avgTekanan);
+        myChart.data.datasets[3].data.push(avgMetana);
+        
+        if (myChart.data.labels.length > 20) {
+            myChart.data.labels.shift();
+            myChart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+        myChart.update();
+    }
 }
 
 setInterval(fetchData, 3000);
@@ -750,8 +856,28 @@ async function fetchServerHealth() {
         document.getElementById("sh-data").innerText = data.total_data.toLocaleString('id-ID');
         document.getElementById("sh-users").innerText = data.total_users;
     } catch(e) {
-        document.getElementById("sh-uptime").innerText = "Server Error";
+        if(document.getElementById("sh-uptime")) document.getElementById("sh-uptime").innerText = "Server Error";
     }
+}
+
+function updateChartVisibility() {
+    if(!historyChartInstance) return;
+    const checkboxes = document.querySelectorAll('.chart-filter');
+    checkboxes.forEach((cb) => {
+        const datasetIndex = parseInt(cb.value);
+        historyChartInstance.data.datasets[datasetIndex].hidden = !cb.checked;
+    });
+    historyChartInstance.update();
+}
+
+function updateGlobalChartVisibility() {
+    if(!myChart) return;
+    const checkboxes = document.querySelectorAll('.global-chart-filter');
+    checkboxes.forEach((cb) => {
+        const datasetIndex = parseInt(cb.value);
+        myChart.data.datasets[datasetIndex].hidden = !cb.checked;
+    });
+    myChart.update();
 }
 
 if (userRole !== 'master_admin') {
