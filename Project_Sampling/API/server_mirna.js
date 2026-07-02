@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 // 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA)
 // ==========================================
 const db = mysql.createConnection({
-    host: '10.40.87.115', 
+    host: '10.213.24.115', 
     user: 'root',      
     password: 'root123',      
     database: 'iot_padi' 
@@ -40,16 +40,103 @@ db.connect((err) => {
         db.query(createTableQuery, (err) => {
             if (err) console.error("Gagal membuat tabel daftar_device:", err.message);
         });
+
+        // Membuat tabel schedules untuk fitur otomatis/terjadwal
+        const createScheduleQuery = `
+            CREATE TABLE IF NOT EXISTS schedules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                chamber_id VARCHAR(50),
+                command_name VARCHAR(50),
+                command_value VARCHAR(50),
+                scheduled_time VARCHAR(5),
+                last_executed DATE
+            )
+        `;
+        db.query(createScheduleQuery, (err) => {
+            if (err) console.error("Gagal membuat tabel schedules:", err.message);
+        });
+
+        // Membuat tabel users untuk sistem Login Profesional
+        const createUsersQuery = `
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) UNIQUE,
+                password VARCHAR(255),
+                role VARCHAR(20)
+            )
+        `;
+        db.query(createUsersQuery, (err) => {
+            if (!err) {
+                // Memasukkan akun default jika tabel masih kosong
+                db.query("SELECT COUNT(*) AS cnt FROM users", (err, rows) => {
+                    if (rows[0].cnt === 0) {
+                        db.query("INSERT INTO users (username, password, role) VALUES ('operator', 'admin123', 'operator'), ('tamu', 'user123', 'user')");
+                    }
+                });
+            }
+        });
+
+        // Menambahkan kolom syringe_present ke sensor_data secara otomatis (Jika belum ada)
+        db.query("SHOW COLUMNS FROM sensor_data LIKE 'syringe_present'", (err, results) => {
+            if (err) {
+                console.error("Gagal mengecek kolom syringe_present:", err.message);
+            } else if (results.length === 0) {
+                // Kolom belum ada, mari kita tambahkan
+                db.query("ALTER TABLE sensor_data ADD COLUMN syringe_present INT DEFAULT 0", (err2) => {
+                    if (err2) console.error("Gagal menambah kolom syringe_present:", err2.message);
+                    else console.log("Kolom 'syringe_present' berhasil ditambahkan otomatis ke tabel sensor_data! ✅");
+                });
+            }
+        });
         
         // Interval mengecek Offline (jika lebih dari 1 menit tidak kirim data)
         setInterval(() => {
             db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE");
         }, 60000);
+
+        // Interval mengecek Jadwal Otomatis (Setiap 30 detik)
+        setInterval(() => {
+            const now = new Date();
+            const currentHHMM = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            const currentDateStr = now.toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+            const checkQuery = `SELECT * FROM schedules WHERE scheduled_time = ? AND (last_executed != ? OR last_executed IS NULL)`;
+            db.query(checkQuery, [currentHHMM, currentDateStr], (err, results) => {
+                if (err) return;
+                results.forEach(schedule => {
+                    // Eksekusi perintah (Masukkan ke tabel commands)
+                    const insertCmd = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES (?, ?, ?)';
+                    db.query(insertCmd, [schedule.chamber_id, schedule.command_name, schedule.command_value], (err2) => {
+                        if (!err2) {
+                            // Update last_executed agar tidak dieksekusi berulang kali pada menit yang sama
+                            db.query("UPDATE schedules SET last_executed = ? WHERE id = ?", [currentDateStr, schedule.id]);
+                            console.log(`[⏰ OTOMATIS] Menjalankan ${schedule.command_name} ${schedule.command_value} untuk ${schedule.chamber_id} pada ${currentHHMM}`);
+                        }
+                    });
+                });
+            });
+        }, 30000);
     }
 });
 
 // ==========================================
-// 2. POST /api/data (Sensor Data)
+// 2. POST /api/login (Autentikasi Profesional)
+// ==========================================
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    db.query("SELECT * FROM users WHERE username = ? AND password = ?", [username, password], (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan server" });
+        
+        if (results.length > 0) {
+            res.json({ status: "berhasil", role: results[0].role, username: results[0].username });
+        } else {
+            res.status(401).json({ status: "gagal", pesan: "Username atau Password salah!" });
+        }
+    });
+});
+
+// ==========================================
+// 3. POST /api/data (Sensor Data)
 // ==========================================
 app.post('/api/data', (req, res) => {
     const { device, suhu, kelembaban, tekanan, gas_metana, syringe_present } = req.body;
@@ -80,7 +167,19 @@ app.post('/api/data', (req, res) => {
 });
 
 // ==========================================
-// 3. GET /api/data/latest/:device (Ambil Data Terbaru Spesifik Device)
+// 3A. GET /api/data/latest (Ambil Data Terbaru Secara Umum)
+// ==========================================
+app.get('/api/data/latest', (req, res) => {
+    const query = 'SELECT * FROM sensor_data ORDER BY id DESC LIMIT 1';
+    db.query(query, (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        if (results.length > 0) res.json({ status: "berhasil", data: results[0] });
+        else res.json({ status: "berhasil", data: null, pesan: "Data masih kosong" });
+    });
+});
+
+// ==========================================
+// 3B. GET /api/data/latest/:device (Ambil Data Terbaru Spesifik Device)
 // ==========================================
 app.get('/api/data/latest/:device', (req, res) => {
     const query = 'SELECT * FROM sensor_data WHERE nama_device = ? ORDER BY id DESC LIMIT 1';
@@ -121,30 +220,51 @@ app.get('/api/data/history/:device', (req, res) => {
 });
 
 // ==========================================
-// 4. POST /api/commands (Data Array Mirza + Konversi Tanggal)
+// 6. POST /api/commands (Menyimpan Perintah Manual dari Web)
 // ==========================================
 app.post('/api/commands', (req, res) => {
-    const dataCommands = req.body;
-    if (!Array.isArray(dataCommands)) return res.status(400).json({ status: "gagal" });
+    const commands = req.body;
+    
+    if (!Array.isArray(commands) || commands.length === 0) {
+        return res.status(400).json({ status: "gagal", pesan: "Format perintah tidak valid" });
+    }
 
-    const promises = dataCommands.map(item => {
-        // Konversi format tanggal menjadi YYYY-MM-DD HH:MM:SS dengan zona waktu lokal
-        const dateValue = item.created_at ? new Date(item.created_at) : new Date();
-        const tzoffset = dateValue.getTimezoneOffset() * 60000; // offset zona waktu dalam milidetik
-        const formattedDate = new Date(dateValue.getTime() - tzoffset).toISOString().slice(0, 19).replace('T', ' ');
+    const query = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES ?';
+    const values = commands.map(c => [c.chamber_id, c.command_name, c.command_value]);
 
-        const query = 'INSERT INTO commands (chamber_id, command_name, command_value, created_at) VALUES (?, ?, ?, ?)';
-        return new Promise((resolve, reject) => {
-            db.query(query, [item.chamber_id, item.command_name, item.command_value, formattedDate], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
-            });
-        });
+    db.query(query, [values], (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        res.json({ status: "berhasil", pesan: "Perintah berhasil disimpan" });
     });
+});
 
-    Promise.all(promises)
-        .then(() => res.json({ status: "berhasil", pesan: "Data tersimpan" }))
-        .catch(err => res.status(500).json({ status: "gagal", pesan: err.message }));
+// ==========================================
+// 7. API SCHEDULES (Otomasi Terjadwal)
+// ==========================================
+app.get('/api/schedules/:device', (req, res) => {
+    db.query('SELECT * FROM schedules WHERE chamber_id = ? ORDER BY scheduled_time ASC', [req.params.device], (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        res.json({ status: "berhasil", data: results });
+    });
+});
+
+app.post('/api/schedules', (req, res) => {
+    const { chamber_id, command_name, command_value, scheduled_time } = req.body;
+    if (!chamber_id || !command_name || !scheduled_time) {
+        return res.status(400).json({ status: "gagal", pesan: "Data jadwal tidak lengkap" });
+    }
+    const query = 'INSERT INTO schedules (chamber_id, command_name, command_value, scheduled_time) VALUES (?, ?, ?, ?)';
+    db.query(query, [chamber_id, command_name, command_value, scheduled_time], (err) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        res.json({ status: "berhasil", pesan: "Jadwal berhasil ditambahkan" });
+    });
+});
+
+app.delete('/api/schedules/:id', (req, res) => {
+    db.query('DELETE FROM schedules WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        res.json({ status: "berhasil", pesan: "Jadwal berhasil dihapus" });
+    });
 });
 
 // ==========================================

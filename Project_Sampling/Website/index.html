@@ -22,6 +22,8 @@
         </div>
         
         <form id="loginForm">
+            <div id="errorBox" class="alert alert-danger p-2 text-center" style="display: none; font-size: 13px;"></div>
+            
             <div class="mb-3">
                 <label class="form-label fw-bold">Username</label>
                 <div class="input-group">
@@ -36,7 +38,7 @@
                     <input type="password" class="form-control" id="password" placeholder="Masukkan password" required>
                 </div>
             </div>
-            <button type="submit" class="btn btn-brin w-100 py-2 fs-5">Masuk <i class="bi bi-box-arrow-in-right"></i></button>
+            <button type="submit" id="btnLogin" class="btn btn-brin w-100 py-2 fs-5">Masuk <i class="bi bi-box-arrow-in-right"></i></button>
             
             <!-- Teks bantuan untuk percobaan awal -->
             <div class="mt-4 text-center p-3 bg-light rounded border" style="font-size: 12px;">
@@ -54,23 +56,41 @@
         window.location.href = "dashboard.html";
     }
 
-    document.getElementById("loginForm").addEventListener("submit", function(e) {
+    document.getElementById("loginForm").addEventListener("submit", async function(e) {
         e.preventDefault();
         
-        const user = document.getElementById("username").value;
-        const pass = document.getElementById("password").value;
+        const user = document.getElementById("username").value.trim();
+        const pass = document.getElementById("password").value.trim();
+        const btn = document.getElementById("btnLogin");
+        const errBox = document.getElementById("errorBox");
 
-        // Logika Pengecekan Akun Sederhana
-        if (user === "operator" && pass === "admin123") {
-            sessionStorage.setItem("role", "operator");
-            sessionStorage.setItem("username", "Operator Utama");
-            window.location.href = "dashboard.html";
-        } else if (user === "tamu" && pass === "user123") {
-            sessionStorage.setItem("role", "user");
-            sessionStorage.setItem("username", "Tamu Publik");
-            window.location.href = "dashboard.html";
-        } else {
-            alert("Username atau Password salah! Silakan periksa kembali.");
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Loading...`;
+        
+        try {
+            const res = await fetch('http://localhost:3000/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+            
+            const json = await res.json();
+            
+            if (res.ok && json.status === "berhasil") {
+                sessionStorage.setItem("role", json.role);
+                sessionStorage.setItem("username", json.username.toUpperCase());
+                window.location.href = "dashboard.html";
+            } else {
+                errBox.style.display = "block";
+                errBox.innerText = json.pesan || "Login Gagal!";
+                btn.disabled = false;
+                btn.innerText = "Masuk";
+            }
+        } catch (error) {
+            errBox.style.display = "block";
+            errBox.innerText = "Tidak dapat terhubung ke server database.";
+            btn.disabled = false;
+            btn.innerText = "Masuk";
         }
     });
 </script>

@@ -15,13 +15,22 @@
     <!-- Floating Sidebar Kiri -->
     <aside class="sidebar-pill">
         <div class="logo-icon"><i class="bi bi-heptagon-fill"></i></div>
-        <a href="#" class="active" title="Dashboard"><i class="bi bi-house-door-fill"></i></a>
-        <a href="#" title="Settings"><i class="bi bi-sliders"></i></a>
+        <a href="#" class="active" id="nav-dashboard" onclick="switchView('dashboard')" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard Utama"><i class="bi bi-house-door-fill"></i></a>
+        <a href="#" id="nav-database" onclick="switchView('database')" data-bs-toggle="tooltip" data-bs-placement="right" title="Master Data (Segera)"><i class="bi bi-database"></i></a>
+        <a href="#" id="nav-settings" onclick="switchView('settings')" data-bs-toggle="tooltip" data-bs-placement="right" title="Pengaturan Sistem"><i class="bi bi-sliders"></i></a>
+        
         <div class="spacer"></div>
-        <a href="#" onclick="logout()" title="Keluar"><i class="bi bi-box-arrow-right text-danger"></i></a>
+        
+        <a href="#" class="position-relative" data-bs-toggle="tooltip" data-bs-placement="right" title="Notifikasi Alarm">
+            <i class="bi bi-bell"></i>
+            <span class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle">
+                <span class="visually-hidden">New alerts</span>
+            </span>
+        </a>
+        <a href="#" onclick="logout()" data-bs-toggle="tooltip" data-bs-placement="right" title="Keluar Log Out"><i class="bi bi-box-arrow-right text-danger"></i></a>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content" id="view-dashboard">
         <!-- Top Toolbar -->
         <header class="top-toolbar">
             
@@ -142,6 +151,77 @@
                                     <h4 class="mb-0 fw-bold" id="detail-metana">-- ppm</h4>
                                 </div>
                             </div>
+
+                            <!-- PANEL KONTROL LANJUTAN -->
+                            <hr class="my-4">
+                            <h6 class="fw-bold mb-3 text-secondary">Panel Kontrol <span id="detail-ctrl-badge" class="badge bg-secondary ms-1">Offline</span></h6>
+                            
+                            <ul class="nav nav-pills nav-fill mb-3" id="ctrl-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1" id="tab-manual" data-bs-toggle="pill" data-bs-target="#panel-manual" type="button" role="tab"><i class="bi bi-hand-index-thumb"></i> Manual</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1" id="tab-otomatis" data-bs-toggle="pill" data-bs-target="#panel-otomatis" type="button" role="tab"><i class="bi bi-clock-history"></i> Otomatis</button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="ctrl-tabContent">
+                                <!-- Mode Manual -->
+                                <div class="tab-pane fade show active" id="panel-manual" role="tabpanel">
+                                    <div class="p-3 bg-light rounded border">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <span class="fw-bold text-secondary small"><i class="bi bi-fan"></i> Kipas</span>
+                                            <label class="switch-mini">
+                                                <input type="checkbox" id="detail-kipas-switch">
+                                                <span class="slider-mini"></span>
+                                            </label>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="fw-bold text-secondary small"><i class="bi bi-syringe"></i> Syringe</span>
+                                            <div class="btn-group-tiny">
+                                                <button id="detail-btn-up" class="btn btn-outline-primary btn-sm py-0 px-2" disabled>UP</button>
+                                                <button id="detail-btn-down" class="btn btn-outline-primary btn-sm py-0 px-2" disabled>DWN</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Mode Otomatis -->
+                                <div class="tab-pane fade" id="panel-otomatis" role="tabpanel">
+                                    <div class="p-2 bg-light rounded border mb-2">
+                                        <form id="form-jadwal" onsubmit="tambahJadwal(event)">
+                                            <div class="row g-1 align-items-center">
+                                                <div class="col-5">
+                                                    <select class="form-select form-select-sm" id="jadwal-alat" required style="font-size: 11px;">
+                                                        <option value="kipas-ON">Kipas ON</option>
+                                                        <option value="kipas-OFF">Kipas OFF</option>
+                                                        <option value="syringe-UP">Syringe UP</option>
+                                                        <option value="syringe-DOWN">Syringe DWN</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-4">
+                                                    <input type="time" class="form-control form-control-sm" id="jadwal-waktu" required style="font-size: 11px;">
+                                                </div>
+                                                <div class="col-3 text-end">
+                                                    <button type="submit" class="btn btn-primary btn-sm w-100" style="font-size: 11px;"><i class="bi bi-plus"></i> Set</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    
+                                    <div class="table-responsive border rounded" style="max-height: 120px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover text-center mb-0" style="font-size: 10px;">
+                                            <thead class="table-light sticky-top">
+                                                <tr><th>Aksi</th><th>Waktu</th><th>Hapus</th></tr>
+                                            </thead>
+                                            <tbody id="list-jadwal">
+                                                <tr><td colspan="3">Tidak ada jadwal</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                         
                         <!-- Kolom Kanan: Chart & Tabel -->
@@ -175,8 +255,36 @@
         </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="script.js"></script>
+    <!-- HALAMAN PENGATURAN (Sembunyi secara default) -->
+    <main class="main-content" id="view-settings" style="display: none;">
+        <header class="toolbar d-flex align-items-center mb-4">
+            <div class="pill fw-bold"><i class="bi bi-sliders text-primary"></i> Pengaturan Sistem</div>
+        </header>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info"></i> Manajemen Akun (Segera)</h5>
+                    <p class="text-muted small">Di sini nantinya Operator dapat menambah atau menghapus user, serta mengubah password langsung dari database.</p>
+                    <button class="btn btn-outline-secondary btn-sm" disabled>Kelola User</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-database text-warning"></i> Pemeliharaan Database</h5>
+                    <p class="text-muted small">Bersihkan data log yang sudah berumur lebih dari 30 hari untuk menjaga kecepatan server tetap optimal.</p>
+                    <button class="btn btn-outline-danger btn-sm" disabled>Bersihkan Data Usang</button>
+                </div>
+            </div>
+        </div>
+    </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Inisialisasi Tooltip Bootstrap
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+    </script>
 </body>
 </html>

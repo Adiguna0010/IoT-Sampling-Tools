@@ -13,7 +13,9 @@ function logout() {
 
 let myChart;
 let historyChartInstance;
-let activeChambers = ['Chamber 1']; // Default 1 chamber terpasang
+let currentDetailChamber = ""; // Menyimpan chamber yang sedang dibuka detailnya
+// Coba ambil dari LocalStorage, jika kosong gunakan default ['Chamber 1']
+let activeChambers = JSON.parse(localStorage.getItem('savedChambers')) || ['Chamber 1'];
 
 window.onload = function() {
     document.getElementById("display-username").innerText = username;
@@ -29,13 +31,44 @@ window.onload = function() {
 
     document.getElementById("active-users-count").innerText = Math.floor(Math.random() * 3) + 1;
 
+    // Sembunyikan kontrol yang bukan hak User biasa
     if (userRole === "user") {
         const opControls = document.getElementById("operator-controls");
         if (opControls) opControls.style.display = "none";
+        
+        // Sembunyikan ikon settings dari sidebar
+        const navSettings = document.getElementById("nav-settings");
+        if (navSettings) navSettings.style.display = "none";
     }
 
     initChart();
     load();
+}
+
+// Fungsi Navigasi Sidebar
+function switchView(viewName) {
+    // Sembunyikan semua halaman (main)
+    document.getElementById("view-dashboard").style.display = "none";
+    document.getElementById("view-settings").style.display = "none";
+    
+    // Matikan efek aktif di semua ikon navigasi
+    document.getElementById("nav-dashboard").classList.remove("active");
+    if(document.getElementById("nav-database")) document.getElementById("nav-database").classList.remove("active");
+    if(document.getElementById("nav-settings")) document.getElementById("nav-settings").classList.remove("active");
+
+    // Nyalakan yang dipilih
+    if (viewName === 'dashboard') {
+        document.getElementById("view-dashboard").style.display = "block";
+        document.getElementById("nav-dashboard").classList.add("active");
+    } else if (viewName === 'settings') {
+        document.getElementById("view-settings").style.display = "block";
+        document.getElementById("nav-settings").classList.add("active");
+    } else if (viewName === 'database') {
+        // Tampilkan halaman database jika nanti dibuat
+        alert("Modul Master Data akan segera hadir!");
+        document.getElementById("view-dashboard").style.display = "block";
+        document.getElementById("nav-dashboard").classList.add("active");
+    }
 }
 
 // ==========================================
@@ -124,6 +157,7 @@ async function prosesTambahChamber() {
             if (found) {
                 if (!activeChambers.includes(chamberId)) {
                     activeChambers.push(chamberId);
+                    localStorage.setItem('savedChambers', JSON.stringify(activeChambers));
                     load();
                     // Tutup modal
                     bootstrap.Modal.getInstance(document.getElementById('modalTambah')).hide();
@@ -143,6 +177,7 @@ async function prosesTambahChamber() {
 function kurangiChamber() {
     if (activeChambers.length > 1) {
         activeChambers.pop();
+        localStorage.setItem('savedChambers', JSON.stringify(activeChambers));
         load();
     } else {
         alert("Minimal 1 Chamber harus tampil!");
@@ -151,6 +186,7 @@ function kurangiChamber() {
 
 // Membuka Modal Detail (Sensor Terkini + Log Activity)
 async function bukaDetail(chamberId) {
+    currentDetailChamber = chamberId;
     document.getElementById("detailChamberTitle").innerText = chamberId;
     
     // Set loading state untuk teks di kiri
@@ -160,8 +196,27 @@ async function bukaDetail(chamberId) {
     document.getElementById("detail-metana").innerText = "-- ppm";
     document.getElementById("logTableBody").innerHTML = `<tr><td colspan="5">Memuat data...</td></tr>`;
 
+    // Sembunyikan kontrol jika level User
+    if (userRole === "user") {
+        document.getElementById("ctrl-tabs").style.display = "none";
+        document.getElementById("ctrl-tabContent").innerHTML = `<div class="text-center text-muted mt-3"><i class="bi bi-lock-fill"></i> Kontrol Terkunci</div>`;
+    }
+
+    // Sambungkan fungsi tombol manual
+    const safeId = chamberId.replace(/\s+/g, '-');
+    const kipasSwitch = document.getElementById("detail-kipas-switch");
+    const btnUp = document.getElementById("detail-btn-up");
+    const btnDown = document.getElementById("detail-btn-down");
+    
+    if (kipasSwitch) kipasSwitch.onchange = () => toggleKipas(chamberId, kipasSwitch.id);
+    if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, safeId, 'UP');
+    if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, safeId, 'DOWN');
+
     const modal = new bootstrap.Modal(document.getElementById('modalDetail'));
     modal.show();
+    
+    // Load Jadwal
+    loadJadwal();
     
     try {
         // Ambil Data Terkini untuk Panel Kiri
@@ -210,6 +265,71 @@ async function bukaDetail(chamberId) {
         }
     } catch(e) {
         document.getElementById("logTableBody").innerHTML = `<tr><td colspan="5" class="text-danger">Gagal mengambil data dari server.</td></tr>`;
+    }
+}
+
+// ==========================================
+// LOGIKA JADWAL OTOMATIS
+// ==========================================
+async function loadJadwal() {
+    if (!currentDetailChamber || userRole === "user") return;
+    try {
+        const res = await fetch(`http://localhost:3000/api/schedules/${currentDetailChamber}`);
+        const json = await res.json();
+        const tbody = document.getElementById("list-jadwal");
+        
+        if (json.status === "berhasil" && json.data.length > 0) {
+            let html = "";
+            json.data.forEach(item => {
+                html += `<tr>
+                    <td class="text-start">${item.command_name.toUpperCase()} ${item.command_value}</td>
+                    <td class="fw-bold text-primary">${item.scheduled_time}</td>
+                    <td><button class="btn btn-sm text-danger p-0" onclick="hapusJadwal(${item.id})"><i class="bi bi-trash"></i></button></td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        } else {
+            tbody.innerHTML = `<tr><td colspan="3">Tidak ada jadwal</td></tr>`;
+        }
+    } catch(e) {
+        console.error("Gagal meload jadwal", e);
+    }
+}
+
+async function tambahJadwal(event) {
+    event.preventDefault();
+    if(userRole !== "operator") return;
+    
+    const alatVal = document.getElementById("jadwal-alat").value.split("-"); // kipas-ON -> ['kipas', 'ON']
+    const timeVal = document.getElementById("jadwal-waktu").value;
+    
+    try {
+        const res = await fetch('http://localhost:3000/api/schedules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chamber_id: currentDetailChamber,
+                command_name: alatVal[0],
+                command_value: alatVal[1],
+                scheduled_time: timeVal
+            })
+        });
+        const json = await res.json();
+        if(json.status === "berhasil") loadJadwal();
+        else alert(json.pesan);
+    } catch (error) {
+        alert("Gagal menyimpan jadwal.");
+    }
+}
+
+async function hapusJadwal(id) {
+    if(userRole !== "operator") return;
+    if(!confirm("Hapus jadwal ini?")) return;
+    try {
+        await fetch(`http://localhost:3000/api/schedules/${id}`, { method: 'DELETE' });
+        loadJadwal();
+    } catch (error) {
+        alert("Gagal menghapus jadwal.");
     }
 }
 
@@ -355,6 +475,26 @@ async function fetchData() {
                                 presenceBadge.className = "badge bg-danger";
                                 btnUp.disabled = true;
                                 btnDown.disabled = true;
+                            }
+                        }
+                        
+                        // Update status di Modal Detail (jika sedang terbuka)
+                        if (currentDetailChamber === chamberId) {
+                            const detailBadge = document.getElementById("detail-ctrl-badge");
+                            const dBtnUp = document.getElementById("detail-btn-up");
+                            const dBtnDown = document.getElementById("detail-btn-down");
+                            if (detailBadge && dBtnUp && dBtnDown) {
+                                if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                                    detailBadge.innerText = "Syringe Siap";
+                                    detailBadge.className = "badge bg-success ms-1";
+                                    dBtnUp.disabled = false;
+                                    dBtnDown.disabled = false;
+                                } else {
+                                    detailBadge.innerText = "Syringe Kosong";
+                                    detailBadge.className = "badge bg-danger ms-1";
+                                    dBtnUp.disabled = true;
+                                    dBtnDown.disabled = true;
+                                }
                             }
                         }
                     }
