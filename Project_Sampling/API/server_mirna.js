@@ -17,9 +17,9 @@ app.use((req, res, next) => {
 // 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA)
 // ==========================================
 const db = mysql.createConnection({
-    host: '10.213.24.115', 
+    host: 'localhost', 
     user: 'root',      
-    password: 'root123',      
+    password: '',      
     database: 'iot_padi' 
 });
 
