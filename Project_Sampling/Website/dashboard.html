@@ -310,7 +310,23 @@
             <div class="col-md-6" id="exportDataCard">
                 <div class="p-4 bg-white rounded-4 shadow-sm border">
                     <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-spreadsheet text-success"></i> Export Data CSV</h5>
-                    <p class="text-muted small">Unduh seluruh riwayat data sensor ke format CSV untuk dibuka di Excel/Spreadsheet.</p>
+                    <p class="text-muted small">Unduh riwayat data sensor ke format CSV.</p>
+                    <div class="mb-2">
+                        <label class="form-label small mb-0">Pilih Chamber</label>
+                        <select class="form-select form-select-sm" id="export-chamber">
+                            <option value="all">Semua Chamber</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">Dari Tanggal</label>
+                            <input type="date" class="form-control form-control-sm" id="export-start">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-0">Sampai Tanggal</label>
+                            <input type="date" class="form-control form-control-sm" id="export-end">
+                        </div>
+                    </div>
                     <button class="btn btn-success btn-sm w-100" onclick="exportDataCSV()"><i class="bi bi-download"></i> Unduh Data Sensor</button>
                 </div>
             </div>

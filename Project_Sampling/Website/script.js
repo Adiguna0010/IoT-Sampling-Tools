@@ -66,6 +66,15 @@ function switchView(viewName) {
     } else if (viewName === 'settings') {
         document.getElementById("view-settings").style.display = "block";
         document.getElementById("nav-settings").classList.add("active");
+        
+        // Populate export chambers
+        const expChamber = document.getElementById("export-chamber");
+        if(expChamber) {
+            expChamber.innerHTML = '<option value="all">Semua Chamber</option>';
+            activeChambers.forEach(ch => {
+                expChamber.innerHTML += `<option value="${ch}">${ch}</option>`;
+            });
+        }
     } else if (viewName === 'database') {
         // Tampilkan halaman database jika nanti dibuat
         alert("Modul Master Data akan segera hadir!");
@@ -646,37 +655,74 @@ async function cleanDatabase() {
 }
 
 async function exportDataCSV() {
+    const btnExport = document.querySelector("#exportDataCard button");
+    const originalText = btnExport.innerHTML;
+    
     try {
-        const res = await fetch('http://localhost:3000/api/data');
-        const data = await res.json();
-        if(data.length === 0) { alert('Tidak ada data untuk di-export.'); return; }
+        btnExport.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyiapkan Data...';
+        btnExport.disabled = true;
+
+        const chamber = document.getElementById("export-chamber").value;
+        const start = document.getElementById("export-start").value;
+        const end = document.getElementById("export-end").value;
         
-        const headers = ['ID', 'Nama Alat', 'Suhu', 'Kelembaban', 'Tekanan', 'Metana', 'Syringe', 'Waktu'];
-        let csvContent = headers.join(',') + '\\n';
+        let url = `http://localhost:3000/api/export?chamber=${chamber}`;
+        if(start) url += `&start=${start}`;
+        if(end) url += `&end=${end}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        if(data.length === 0) { 
+            alert('Tidak ada data pada periode/chamber tersebut.'); 
+            btnExport.innerHTML = originalText;
+            btnExport.disabled = false;
+            return; 
+        }
+        
+        const headers = ['ID', 'Nama Alat', 'Suhu (°C)', 'Kelembaban (%)', 'Tekanan (hPa)', 'Metana (ppm)', 'Status Syringe', 'Waktu'];
+        let csvContent = '\uFEFF' + headers.join(';') + '\n';
         
         data.forEach(row => {
+            // Format Waktu ke Lokal (YYYY-MM-DD HH:mm:ss)
+            const dateObj = new Date(row.created_at);
+            const formattedDate = dateObj.getFullYear() + "-" + 
+                String(dateObj.getMonth() + 1).padStart(2, '0') + "-" + 
+                String(dateObj.getDate()).padStart(2, '0') + " " + 
+                String(dateObj.getHours()).padStart(2, '0') + ":" + 
+                String(dateObj.getMinutes()).padStart(2, '0') + ":" + 
+                String(dateObj.getSeconds()).padStart(2, '0');
+            
+            // Terjemahkan Status Syringe
+            const syringeStr = (row.syringe_present == 1) ? "Siap" : "Kosong";
+
             let rowData = [
                 row.id, row.nama_device, row.suhu, row.kelembaban, row.tekanan, row.gas_metana,
-                row.syringe_present, `"${row.created_at}"`
+                syringeStr, `"${formattedDate}"`
             ];
-            csvContent += rowData.join(',') + '\\n';
+            csvContent += rowData.join(';') + '\n';
         });
         
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        const urlBlob = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'Export_Sensor_Data.csv');
+        link.setAttribute('href', urlBlob);
+        link.setAttribute('download', `Data_Sensor_${chamber}_${start||'awal'}_${end||'akhir'}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(urlBlob);
     } catch (e) {
         alert('Gagal mengambil data untuk export CSV');
+    } finally {
+        btnExport.innerHTML = originalText;
+        btnExport.disabled = false;
     }
 }
 
 if (userRole !== 'master_admin') {
     if(document.getElementById('btnKelolaUser')) document.getElementById('btnKelolaUser').style.display = 'none';
     if(document.getElementById('dbCleanControl')) document.getElementById('dbCleanControl').style.display = 'none';
+}
+if (userRole === 'user') {
     if(document.getElementById('exportDataCard')) document.getElementById('exportDataCard').style.display = 'none';
 }

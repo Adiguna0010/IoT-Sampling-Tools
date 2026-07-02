@@ -173,6 +173,39 @@ app.post('/api/register', (req, res) => {
     });
 });
 
+app.get('/api/data', (req, res) => {
+    db.query("SELECT * FROM sensor_data ORDER BY id DESC LIMIT 20", (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+    });
+});
+
+app.get('/api/export', (req, res) => {
+    const { chamber, start, end } = req.query;
+    let query = "SELECT * FROM sensor_data WHERE 1=1";
+    let params = [];
+    
+    if (chamber && chamber !== 'all') {
+        query += " AND nama_device = ?";
+        params.push(chamber);
+    }
+    if (start) {
+        query += " AND DATE(created_at) >= ?";
+        params.push(start);
+    }
+    if (end) {
+        query += " AND DATE(created_at) <= ?";
+        params.push(end);
+    }
+    
+    query += " ORDER BY id ASC";
+    
+    db.query(query, params, (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+    });
+});
+
 app.get('/api/users', (req, res) => {
     db.query("SELECT id, username, password, role, is_approved FROM users ORDER BY id DESC", (err, results) => {
         if (err) return res.status(500).json(err);
