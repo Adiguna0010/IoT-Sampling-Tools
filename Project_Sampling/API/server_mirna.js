@@ -92,6 +92,15 @@ db.connect((err) => {
             }
         });
 
+        // Patch: Update tabel users untuk mendukung Master Admin & Persetujuan Login
+        db.query("ALTER TABLE users MODIFY role VARCHAR(50)", () => {
+            db.query("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT FALSE", () => {
+                // Auto-approve user lama & Insert master admin default
+                db.query("UPDATE users SET is_approved = TRUE");
+                db.query("INSERT IGNORE INTO users (username, password, role, is_approved) VALUES ('master', 'master123', 'master_admin', TRUE)");
+            });
+        });
+
         // Menambahkan kolom syringe_present ke sensor_data secara otomatis (Jika belum ada)
         db.query("SHOW COLUMNS FROM sensor_data LIKE 'syringe_present'", (err, results) => {
             if (err) {
@@ -144,10 +153,68 @@ app.post('/api/login', (req, res) => {
         if (err) return res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan server" });
         
         if (results.length > 0) {
-            res.json({ status: "berhasil", role: results[0].role, username: results[0].username });
+            const user = results[0];
+            if (!user.is_approved) {
+                return res.status(403).json({ status: "gagal", pesan: "Akun belum disetujui oleh Master Admin!" });
+            }
+            res.json({ status: "berhasil", role: user.role, username: user.username });
         } else {
             res.status(401).json({ status: "gagal", pesan: "Username atau Password salah!" });
         }
+    });
+});
+
+app.post('/api/register', (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ status: "gagal", pesan: "Data tidak lengkap" });
+    db.query("INSERT INTO users (username, password, role, is_approved) VALUES (?, ?, 'user', FALSE)", [username, password], (err) => {
+        if (err) return res.status(400).json({ status: "gagal", pesan: "Username mungkin sudah terdaftar." });
+        res.json({ status: "berhasil", pesan: "Berhasil mendaftar. Menunggu persetujuan Master Admin." });
+    });
+});
+
+app.get('/api/users', (req, res) => {
+    db.query("SELECT id, username, password, role, is_approved FROM users ORDER BY id DESC", (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+    });
+});
+
+app.put('/api/users/:id/approve', (req, res) => {
+    db.query("UPDATE users SET is_approved = TRUE WHERE id = ?", [req.params.id], (err) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", pesan: "Akun disetujui!" });
+    });
+});
+
+app.delete('/api/users/:id', (req, res) => {
+    db.query("DELETE FROM users WHERE id = ?", [req.params.id], (err) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", pesan: "Akun dihapus!" });
+    });
+});
+
+app.put('/api/users/:id/role', (req, res) => {
+    const { role } = req.body;
+    db.query("UPDATE users SET role = ? WHERE id = ?", [role, req.params.id], (err) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", pesan: "Jabatan diubah!" });
+    });
+});
+
+app.put('/api/users/:id/reset-password', (req, res) => {
+    const newPass = "reset123";
+    db.query("UPDATE users SET password = ? WHERE id = ?", [newPass, req.params.id], (err) => {
+        if (err) return res.status(500).json({ status: "gagal" });
+        res.json({ status: "berhasil", pesan: `Sandi di-reset menjadi: ${newPass}` });
+    });
+});
+
+app.delete('/api/database/clean', (req, res) => {
+    const days = parseInt(req.query.days) || 30;
+    db.query(`DELETE FROM sensor_data WHERE created_at < NOW() - INTERVAL ${days} DAY`, (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+        res.json({ status: "berhasil", pesan: `${results.affectedRows} baris data usang berhasil dihapus.` });
     });
 });
 

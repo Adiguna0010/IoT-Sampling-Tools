@@ -24,6 +24,9 @@ window.onload = function() {
     if(userRole === "operator") {
         roleBadge.innerText = "Operator";
         roleBadge.className = "badge bg-primary ms-2";
+    } else if (userRole === "master_admin") {
+        roleBadge.innerText = "Master Admin";
+        roleBadge.className = "badge bg-danger ms-2";
     } else {
         roleBadge.innerText = "User";
         roleBadge.className = "badge bg-secondary ms-2";
@@ -79,7 +82,7 @@ function buatCard(id) {
     // Buat id yang valid untuk HTML attributes (hilangkan spasi)
     const safeId = id.replace(/\s+/g, '-');
     
-    const controlPanelHTML = (userRole === "operator") ? `
+    const controlPanelHTML = (userRole === "operator" || userRole === "master_admin") ? `
         <div class="control-section">
             <div class="ctrl-row">
                 <span><i class="bi bi-fan text-secondary"></i> Kipas</span>
@@ -319,7 +322,7 @@ async function loadJadwal() {
 
 async function tambahJadwal(event) {
     event.preventDefault();
-    if(userRole !== "operator") return;
+    if(userRole === "user") return;
     
     const alatVal = document.getElementById("jadwal-alat").value.split("-"); // kipas-ON -> ['kipas', 'ON']
     const timeVal = document.getElementById("jadwal-waktu").value;
@@ -344,7 +347,7 @@ async function tambahJadwal(event) {
 }
 
 async function hapusJadwal(id) {
-    if(userRole !== "operator") return;
+    if(userRole === "user") return;
     if(!confirm("Hapus jadwal ini?")) return;
     try {
         await fetch(`http://localhost:3000/api/schedules/${id}`, { method: 'DELETE' });
@@ -479,7 +482,7 @@ async function fetchData() {
                         myChart.update();
                     }
                     
-                    if (userRole === "operator") {
+                    if (userRole !== "user") {
                         let isPresent = data.syringe_present || 0; 
                         const presenceBadge = document.getElementById(`syringe-presence-${safeId}`);
                         const btnUp = document.getElementById(`btn-up-${safeId}`);
@@ -530,7 +533,7 @@ async function fetchData() {
 setInterval(fetchData, 3000);
 
 async function toggleKipas(chamberId, safeId) {
-    if(userRole !== "operator") return;
+    if(userRole === "user") return;
     const kipasToggle = document.getElementById(`kipas-${safeId}`);
     try {
         const payload = [{ chamber_id: chamberId, command_name: "Kipas", command_value: kipasToggle.checked ? "1" : "0" }];
@@ -542,7 +545,7 @@ async function toggleKipas(chamberId, safeId) {
 }
 
 async function moveSyringe(chamberId, safeId, direction) {
-    if(userRole !== "operator") return;
+    if(userRole === "user") return;
     const presenceBadge = document.getElementById(`syringe-presence-${safeId}`).innerText;
     if (presenceBadge === "Kosong" || presenceBadge === "Cek") {
         alert("ERROR: Tidak ada syringe terdeteksi di alat!");
@@ -554,4 +557,126 @@ async function moveSyringe(chamberId, safeId, direction) {
     } catch (error) {
         alert("Gagal menggerakkan syringe.");
     }
+}
+
+// ==========================================
+// MASTER ADMIN & EXTRA FEATURES
+// ==========================================
+if (document.getElementById('btnKelolaUser')) {
+    document.getElementById('btnKelolaUser').addEventListener('click', loadUsers);
+}
+
+async function loadUsers() {
+    if(userRole !== 'master_admin') return;
+    const tbody = document.getElementById('user-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+    try {
+        const res = await fetch('http://localhost:3000/api/users');
+        const users = await res.json();
+        tbody.innerHTML = '';
+        users.forEach(u => {
+            let statusBadge = u.is_approved ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-warning text-dark">Pending</span>';
+            let actionBtn = '';
+            let roleHtml = u.role;
+            
+            if(u.role !== 'master_admin') {
+                roleHtml = `<select class="form-select form-select-sm d-inline-block w-auto py-0" onchange="changeRole(${u.id}, this.value)">
+                    <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                    <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>Operator</option>
+                </select>`;
+            }
+            if(!u.is_approved) {
+                actionBtn += `<button class="btn btn-sm btn-success me-1" onclick="approveUser(${u.id})" title="Setujui"><i class="bi bi-check"></i></button>`;
+            }
+            if(u.role !== 'master_admin') {
+                actionBtn += `<button class="btn btn-sm btn-warning me-1" onclick="resetPassword(${u.id})" title="Reset Password"><i class="bi bi-key"></i></button>`;
+                actionBtn += `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})" title="Hapus"><i class="bi bi-trash"></i></button>`;
+            }
+            let passStr = `<span class="font-monospace text-muted" style="font-size:11px;">${u.password}</span>`;
+            tbody.innerHTML += `<tr><td>${u.id}</td><td>${u.username}</td><td>${passStr}</td><td>${roleHtml}</td><td>${statusBadge}</td><td class="text-end">${actionBtn}</td></tr>`;
+        });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Gagal memuat data</td></tr>';
+    }
+}
+
+async function approveUser(id) {
+    if(!confirm('Setujui pendaftaran user ini?')) return;
+    await fetch(`http://localhost:3000/api/users/${id}/approve`, { method: 'PUT' });
+    loadUsers();
+}
+
+async function deleteUser(id) {
+    if(!confirm('Yakin ingin menghapus user ini?')) return;
+    await fetch(`http://localhost:3000/api/users/${id}`, { method: 'DELETE' });
+    loadUsers();
+}
+
+async function changeRole(id, newRole) {
+    if(!confirm('Ubah jabatan user ini?')) { loadUsers(); return; }
+    try {
+        const res = await fetch(`http://localhost:3000/api/users/${id}/role`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole })
+        });
+        const json = await res.json();
+        alert(json.pesan);
+        loadUsers();
+    } catch(e) { alert("Gagal mengubah jabatan"); }
+}
+
+async function resetPassword(id) {
+    if(!confirm('Yakin ingin mereset password akun ini?')) return;
+    try {
+        const res = await fetch(`http://localhost:3000/api/users/${id}/reset-password`, { method: 'PUT' });
+        const json = await res.json();
+        alert(json.pesan);
+    } catch(e) { alert("Gagal mereset password"); }
+}
+
+async function cleanDatabase() {
+    const days = document.getElementById("clean-days").value;
+    if(!confirm(`BAHAYA: Yakin ingin menghapus semua data sensor yang umurnya lebih dari ${days} hari?`)) return;
+    try {
+        const res = await fetch(`http://localhost:3000/api/database/clean?days=${days}`, { method: 'DELETE' });
+        const json = await res.json();
+        alert(json.pesan);
+    } catch(e) { alert("Gagal membersihkan database"); }
+}
+
+async function exportDataCSV() {
+    try {
+        const res = await fetch('http://localhost:3000/api/data');
+        const data = await res.json();
+        if(data.length === 0) { alert('Tidak ada data untuk di-export.'); return; }
+        
+        const headers = ['ID', 'Nama Alat', 'Suhu', 'Kelembaban', 'Tekanan', 'Metana', 'Syringe', 'Waktu'];
+        let csvContent = headers.join(',') + '\\n';
+        
+        data.forEach(row => {
+            let rowData = [
+                row.id, row.nama_device, row.suhu, row.kelembaban, row.tekanan, row.gas_metana,
+                row.syringe_present, `"${row.created_at}"`
+            ];
+            csvContent += rowData.join(',') + '\\n';
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'Export_Sensor_Data.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        alert('Gagal mengambil data untuk export CSV');
+    }
+}
+
+if (userRole !== 'master_admin') {
+    if(document.getElementById('btnKelolaUser')) document.getElementById('btnKelolaUser').style.display = 'none';
+    if(document.getElementById('dbCleanControl')) document.getElementById('dbCleanControl').style.display = 'none';
+    if(document.getElementById('exportDataCard')) document.getElementById('exportDataCard').style.display = 'none';
 }

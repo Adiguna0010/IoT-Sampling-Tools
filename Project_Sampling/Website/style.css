@@ -18,7 +18,8 @@ body {
 }
 
 .login-body {
-    background: linear-gradient(135deg, #004A8F, #4A90E2);
+    background: url('bg-login.jpg') no-repeat center center fixed;
+    background-size: cover;
     min-height: 100vh;
     display: flex;
     align-items: center;
