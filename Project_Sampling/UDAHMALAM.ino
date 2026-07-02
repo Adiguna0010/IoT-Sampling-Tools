@@ -4,37 +4,40 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <FastAccelStepper.h> 
 
 // ===================== KONFIGURASI WiFi & SERVER =====================
 const char* WIFI_SSID     = "1234";
 const char* WIFI_PASSWORD = "12345678";
-const char* SERVER_URL    = "http://10.40.87.68:3000/api/data";
+const char* SERVER_URL    = "http://10.213.24.68:3000/api/data";
 
-// ===================== KONFIGURASI PIN SENSOR =====================
-#define SDA_PIN     21
-#define SCL_PIN     22
-#define MQ4_1_PIN   34
-#define MQ4_2_PIN   35
-
-// ===================== KONFIGURASI PIN STEPPER & LIMIT SWITCH =====================
+// ===================== KONFIGURASI PIN =====================
+#define SDA_PIN           21
+#define SCL_PIN           22
+#define MQ4_1_PIN         34
+#define MQ4_2_PIN         35
 #define DIR_PIN           26
 #define STEP_PIN          27
-// Pin ENA dihapus
 #define LIMIT_ATAS_PIN    32
 #define LIMIT_BAWAH_PIN   33
-#define SYRINGE_PIN       4
+#define SYRINGE_PIN       4   
+#define RELAY_PIN         14  
 
-// ===================== KONFIGURASI AVERAGING =====================
+// ===================== KONFIGURASI TIMING =====================
 #define JUMLAH_SAMPLE   5
-#define DELAY_SAMPLE    100
-#define DELAY_LOOP      5000
+#define DELAY_SAMPLE    10    
+const unsigned long INTERVAL_KIRIM = 5000;
+unsigned long waktuSebelumnya = 0;
 
-// ===================== OBJEK SENSOR =====================
-Adafruit_BME280 bme1; // BME280 atas  - 0x76 (SDO ke GND)
-Adafruit_BME280 bme2; // BME280 bawah - 0x77 (SDO ke 3.3V)
+// ===================== OBJEK SENSOR & STEPPER =====================
+Adafruit_BME280 bme1; 
+Adafruit_BME280 bme2; 
 
 bool bme1Status = false;
 bool bme2Status = false;
+
+FastAccelStepperEngine engine;
+FastAccelStepper *stepperMotor = NULL;
 
 // ===================================================================
 //  SETUP
@@ -43,56 +46,77 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Wire.begin(SDA_PIN, SCL_PIN);
+  
   initSensor();
   initWiFi();
 
-  // Setup Pin Stepper
-  pinMode(DIR_PIN, OUTPUT);
-  pinMode(STEP_PIN, OUTPUT);
-
-  // Setup Pin Limit Switch (Internal Pull-Up)
   pinMode(LIMIT_ATAS_PIN, INPUT_PULLUP);
   pinMode(LIMIT_BAWAH_PIN, INPUT_PULLUP);
-  pinMode(SYRINGE_PIN, INPUT_PULLUP); // 0 (LOW) = Tidak ada syringe
+  pinMode(SYRINGE_PIN, INPUT_PULLUP);
   
-  Serial.println("Ketik 'U' untuk gerak NAIK, 'D' untuk TURUN melalui Serial Monitor.");
+  // Set explicit output untuk pin DIR guna mengatasi optocoupler delay
+  pinMode(DIR_PIN, OUTPUT); 
+
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+  
+  engine.init();
+  stepperMotor = engine.stepperConnectToPin(STEP_PIN);
+  if (stepperMotor) {
+    stepperMotor->setDirectionPin(DIR_PIN);
+    stepperMotor->setAutoEnable(false);
+    
+    // Kecepatan 850 Hz
+    stepperMotor->setSpeedInHz(850);      
+    stepperMotor->setAcceleration(2000);
+  }
+
+  Serial.println("--- DAFTAR PERINTAH SERIAL MONITOR ---");
+  Serial.println("'U'        : Stepper gerak NAIK");
+  Serial.println("'D'        : Stepper gerak TURUN");
+  Serial.println("'1'        : Nyalakan Kipas (Relay ON)");
+  Serial.println("'0'        : Matikan Kipas (Relay OFF)");
+  Serial.println("--------------------------------------");
 }
 
 // ===================================================================
-//  FUNGSI: Kontrol Stepper Up / Down (Tanpa ENA)
+//  FUNGSI: Kontrol Stepper Up / Down (UPDATED)
 // ===================================================================
 void gerakStepper(bool arahNaik, int jumlahLangkah) {
-  // 1. Interlock Syringe: Cek deteksi syringe (sinyal LOW/0)
   if (digitalRead(SYRINGE_PIN) == LOW) {
     Serial.println("[ALARM] Syringe tidak terdeteksi! Fitur Up/Down dinonaktifkan.");
-    return; // Batalkan pergerakan motor sepenuhnya
+    return;
   }
 
-  // 2. Siapkan arah motor
-  digitalWrite(DIR_PIN, arahNaik ? HIGH : LOW); // Ubah HIGH/LOW jika arah putaran fisik terbalik
-  Serial.printf("[STEPPER] Motor bergerak %s...\n", arahNaik ? "NAIK" : "TURUN");
+  // --- TAMBAHAN: BERHENTI PAKSA & RESET BUFFER ---
+  stepperMotor->forceStopAndNewPosition(0); 
+  delay(50); // Jeda kecil untuk memastikan motor benar-benar diam
 
-  // 3. Mulai pergerakan dengan perlindungan limit switch
-  for (int i = 0; i < jumlahLangkah; i++) {
-    // Deteksi Limit Switch Atas
+  Serial.printf("[STEPPER] Motor bergerak %s...\n", arahNaik ? "NAIK" : "TURUN");
+  
+  digitalWrite(DIR_PIN, arahNaik ? HIGH : LOW);
+  delay(10); 
+  
+  if (arahNaik) {
+    stepperMotor->move(jumlahLangkah);
+  } else {
+    stepperMotor->move(-jumlahLangkah); 
+  }
+
+  while (stepperMotor->isRunning()) {
     if (arahNaik && digitalRead(LIMIT_ATAS_PIN) == LOW) {
       Serial.println("[INFO] Limit Atas tercapai. Motor Berhenti.");
+      stepperMotor->forceStopAndNewPosition(0);
       break;
     }
     
-    // Deteksi Limit Switch Bawah
     if (!arahNaik && digitalRead(LIMIT_BAWAH_PIN) == LOW) {
       Serial.println("[INFO] Limit Bawah tercapai. Motor Berhenti.");
+      stepperMotor->forceStopAndNewPosition(0);
       break;
     }
-
-    // Generate pulsa (Step)
-    digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(800); // Kecepatan motor (semakin kecil = semakin cepat)
-    digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(800);
+    delay(1); 
   }
-
   Serial.println("[STEPPER] Pergerakan selesai.");
 }
 
@@ -100,68 +124,81 @@ void gerakStepper(bool arahNaik, int jumlahLangkah) {
 //  LOOP UTAMA
 // ===================================================================
 void loop() {
-  // Fitur manual test pergerakan stepper via Serial Monitor
-  // Menggunakan 3750 langkah untuk estimasi jarak 15 cm (Leadscrew 8mm, Full Step)
+  // 1. KONTROL SERIAL (Berjalan setiap saat)
   if (Serial.available() > 0) {
     char cmd = Serial.read();
     if (cmd == 'U' || cmd == 'u') {
-      gerakStepper(true, 3750); 
+      gerakStepper(true, 3750);
     } 
     else if (cmd == 'D' || cmd == 'd') {
-      gerakStepper(false, 3750); 
+      gerakStepper(false, 3750);
+    }
+    else if (cmd == '1') {
+      digitalWrite(RELAY_PIN, HIGH);
+      Serial.println("[KIPAS] Dinyalakan secara manual.");
+    }
+    else if (cmd == '0') {
+      digitalWrite(RELAY_PIN, LOW);
+      Serial.println("[KIPAS] Dimatikan secara manual.");
     }
   }
 
-  // --- PEMBACAAN SENSOR ---
-  float suhu1 = 0, hum1 = 0, tek1 = 0;
-  float suhu2 = 0, hum2 = 0, tek2 = 0;
-  int   adc1  = 0, adc2 = 0;
-  bool  bme1Ok = false, bme2Ok = false;
+  // 2. BACA SENSOR & KIRIM DATA (Setiap 5 detik)
+  unsigned long waktuSekarang = millis();
+  if (waktuSekarang - waktuSebelumnya >= INTERVAL_KIRIM) {
+    waktuSebelumnya = waktuSekarang;
+    
+    float suhu1 = 0, hum1 = 0, tek1 = 0;
+    float suhu2 = 0, hum2 = 0, tek2 = 0;
+    int   adc1  = 0, adc2 = 0;
+    bool  bme1Ok = false, bme2Ok = false;
+    
+    if (bme1Status) bme1Ok = bacaBME(bme1, "BME280 ATAS ", suhu1, hum1, tek1);
+    else            initSensor();
+    
+    if (bme2Status) bme2Ok = bacaBME(bme2, "BME280 BAWAH", suhu2, hum2, tek2);
+    else            initSensor();
 
-  if (bme1Status) bme1Ok = bacaBME(bme1, "BME280 ATAS ", suhu1, hum1, tek1);
-  else            initSensor();
-  
-  if (bme2Status) bme2Ok = bacaBME(bme2, "BME280 BAWAH", suhu2, hum2, tek2);
-  else            initSensor();
+    adc1 = bacaMQ4(MQ4_1_PIN, "MQ-4 ATAS  ");
+    adc2 = bacaMQ4(MQ4_2_PIN, "MQ-4 BAWAH ");
 
-  adc1 = bacaMQ4(MQ4_1_PIN, "MQ-4 ATAS  ");
-  adc2 = bacaMQ4(MQ4_2_PIN, "MQ-4 BAWAH ");
+    float suhuAvg = 0, humAvg = 0, tekAvg = 0;
+    int   bmeValid = 0;
+    
+    if (bme1Ok) { suhuAvg += suhu1; humAvg += hum1; tekAvg += tek1; bmeValid++; }
+    if (bme2Ok) { suhuAvg += suhu2; humAvg += hum2; tekAvg += tek2; bmeValid++; }
+    
+    if (bmeValid > 0) { 
+      suhuAvg /= bmeValid;
+      humAvg /= bmeValid; tekAvg /= bmeValid; 
+    }
 
-  // --- AVERAGING BME280 ---
-  float suhuAvg = 0, humAvg = 0, tekAvg = 0;
-  int   bmeValid = 0;
-  
-  if (bme1Ok) { suhuAvg += suhu1; humAvg += hum1; tekAvg += tek1; bmeValid++; }
-  if (bme2Ok) { suhuAvg += suhu2; humAvg += hum2; tekAvg += tek2; bmeValid++; }
-  if (bmeValid > 0) { suhuAvg /= bmeValid; humAvg /= bmeValid; tekAvg /= bmeValid; }
+    float adcAvg = 0;
+    int   mqValid = 0;
+    if (adc1 >= 0) { adcAvg += adc1; mqValid++; }
+    if (adc2 >= 0) { adcAvg += adc2; mqValid++; }
+    
+    if (mqValid > 0) adcAvg /= mqValid;
+    
+    float ppmAvg = 200.0 + (adcAvg / 4095.0) * 9800.0;
+    float ppm1   = 200.0 + (adc1  / 4095.0) * 9800.0;
+    float ppm2   = 200.0 + (adc2  / 4095.0) * 9800.0;
 
-  // --- AVERAGING MQ-4 ---
-  float adcAvg = 0;
-  int   mqValid = 0;
-  
-  if (adc1 >= 0) { adcAvg += adc1; mqValid++; }
-  if (adc2 >= 0) { adcAvg += adc2; mqValid++; }
-  if (mqValid > 0) adcAvg /= mqValid;
+    bool statusKipas = (digitalRead(RELAY_PIN) == HIGH);
+    
+    Serial.printf("[ATAS]  Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n", suhu1, hum1, tek1, ppm1);
+    Serial.printf("[BAWAH] Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n", suhu2, hum2, tek2, ppm2);
+    Serial.printf("[AVG]   Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n", suhuAvg, humAvg, tekAvg, ppmAvg);
+    Serial.printf("[KIPAS] Status: %s\n", statusKipas ? "ON" : "OFF");
 
-  // Konversi ADC ke PPM (Asumsi rentang kalibrasi linier sederhana)
-  float ppmAvg = 200.0 + (adcAvg / 4095.0) * 9800.0;
-  float ppm1   = 200.0 + (adc1  / 4095.0) * 9800.0;
-  float ppm2   = 200.0 + (adc2  / 4095.0) * 9800.0;
-
-  // Output Serial Monitor
-  Serial.printf("[ATAS]  Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n", suhu1, hum1, tek1, ppm1);
-  Serial.printf("[BAWAH] Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n", suhu2, hum2, tek2, ppm2);
-  Serial.printf("[AVG]   Suhu: %.2f C | Kelembapan: %.2f %% | Tekanan: %.2f hPa | Gas: %.0f ppm\n\n", suhuAvg, humAvg, tekAvg, ppmAvg);
-
-  // --- PENGIRIMAN DATA KE SERVER ---
-  if (WiFi.status() == WL_CONNECTED) {
-    kirimData(suhuAvg, humAvg, tekAvg, (bmeValid > 0), ppmAvg, (mqValid > 0));
-  } else {
-    Serial.println("[WiFi] Terputus, reconnect...");
-    initWiFi();
+    if (WiFi.status() == WL_CONNECTED) {
+      kirimData(suhuAvg, humAvg, tekAvg, (bmeValid > 0), ppmAvg, (mqValid > 0), statusKipas);
+      Serial.println(); 
+    } else {
+      Serial.println("[WiFi] Terputus, reconnect...\n");
+      initWiFi();
+    }
   }
-
-  delay(DELAY_LOOP);
 }
 
 // ===================================================================
@@ -202,7 +239,7 @@ void initWiFi() {
 }
 
 // ===================================================================
-//  FUNGSI: Baca BME280 (Averaging 5 Sample)
+//  FUNGSI: Baca BME280
 // ===================================================================
 bool bacaBME(Adafruit_BME280 &bme, const char* label, float &suhu, float &hum, float &tek) {
   float tS = 0, tH = 0, tT = 0;
@@ -234,7 +271,7 @@ bool bacaBME(Adafruit_BME280 &bme, const char* label, float &suhu, float &hum, f
 }
 
 // ===================================================================
-//  FUNGSI: Baca MQ-4 (Averaging 5 Sample)
+//  FUNGSI: Baca MQ-4
 // ===================================================================
 int bacaMQ4(int pin, const char* label) {
   long total = 0;
@@ -254,29 +291,66 @@ int bacaMQ4(int pin, const char* label) {
 }
 
 // ===================================================================
-//  FUNGSI: Kirim Data via HTTP POST
+//  FUNGSI: Kirim Data & Ambil Instruksi Server via HTTP POST
 // ===================================================================
-void kirimData(float suhu, float hum, float tek, bool bmeOk, float ppmAvg, bool mqOk) {
+void kirimData(float suhu, float hum, float tek, bool bmeOk, float ppmAvg, bool mqOk, bool kipasON) {
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
 
   StaticJsonDocument<256> doc;
-  doc["suhu"]       = bmeOk ? round(suhu * 10) / 10.0 : 0;
-  doc["kelembaban"] = bmeOk ? round(hum  * 10) / 10.0 : 0;
-  doc["tekanan"]    = bmeOk ? round(tek  * 10) / 10.0 : 0;
-  doc["gas_metana"] = mqOk  ? round(ppmAvg) : 0;
-  doc["device"]     = "ESP32-WROOM-Apis";
+  doc["device"]          = "Chamber 1";
+  doc["suhu"]            = bmeOk ? round(suhu * 10) / 10.0 : 0;
+  doc["kelembaban"]      = bmeOk ? round(hum  * 10) / 10.0 : 0;
+  doc["tekanan"]         = bmeOk ? round(tek  * 10) / 10.0 : 0;
+  doc["gas_metana"]      = mqOk  ? round(ppmAvg) : 0;
+  doc["syringe_present"] = (digitalRead(SYRINGE_PIN) == HIGH) ? 1 : 0;
+  doc["kipas_on"]        = kipasON ? 1 : 0; 
 
   String jsonStr;
   serializeJson(doc, jsonStr);
-
   int httpCode = http.POST(jsonStr);
   
   if (httpCode == 200 || httpCode == 201) {
-    Serial.printf("[HTTP] OK - %s\n", http.getString().c_str());
+    String payload = http.getString();
+    Serial.println("[HTTP] Berhasil mengirim data ke server.");
+
+    DynamicJsonDocument docRes(1024);
+    DeserializationError err = deserializeJson(docRes, payload);
+    if (!err) {
+      JsonArray commands = docRes["commands"];
+      if (commands && commands.size() > 0) {
+        Serial.println("[SERVER] Menerima instruksi baru!");
+        for (JsonVariant cmd : commands) {
+          String namaPerintah = cmd["command_name"].as<String>();
+          String nilaiPerintah = cmd["command_value"].as<String>();
+
+          if (namaPerintah == "Syringe") {
+             if (nilaiPerintah == "U" || nilaiPerintah == "UP") {
+                Serial.println(" -> Eksekusi Syringe NAIK");
+                gerakStepper(true, 3750);
+             } 
+             else if (nilaiPerintah == "D" || nilaiPerintah == "DOWN") {
+                Serial.println(" -> Eksekusi Syringe TURUN");
+                gerakStepper(false, 3750);
+             }
+          }
+          else if (namaPerintah == "Kipas") {
+             if (nilaiPerintah == "1") {
+                Serial.println(" -> Eksekusi Kipas ON");
+                digitalWrite(RELAY_PIN, HIGH);
+             } else if (nilaiPerintah == "0") {
+                Serial.println(" -> Eksekusi Kipas OFF");
+                digitalWrite(RELAY_PIN, LOW);
+             }
+          }
+        }
+      }
+    } else {
+      Serial.printf("[JSON] Gagal parsing respon: %s\n", err.c_str());
+    }
   } else {
-    Serial.printf("[HTTP] GAGAL - code: %d\n", httpCode);
+    Serial.printf("[HTTP] GAGAL POST - code: %d\n", httpCode);
   }
   http.end();
 }

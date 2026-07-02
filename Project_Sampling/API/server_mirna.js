@@ -41,6 +41,22 @@ db.connect((err) => {
             if (err) console.error("Gagal membuat tabel daftar_device:", err.message);
         });
 
+        // Patch: Re-create tabel commands agar strukturnya benar (VARCHAR 50)
+        db.query("DROP TABLE IF EXISTS commands", () => {
+            const createCmdQuery = `
+                CREATE TABLE commands (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    chamber_id VARCHAR(50),
+                    command_name VARCHAR(50),
+                    command_value VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `;
+            db.query(createCmdQuery, (err) => {
+                if (err) console.error("Gagal membuat ulang tabel commands:", err.message);
+            });
+        });
+
         // Membuat tabel schedules untuk fitur otomatis/terjadwal
         const createScheduleQuery = `
             CREATE TABLE IF NOT EXISTS schedules (
@@ -135,8 +151,15 @@ app.post('/api/login', (req, res) => {
     });
 });
 
+app.get('/api/debug-db', (req, res) => {
+    db.query('DESCRIBE commands', (err, rows) => {
+        if (err) return res.json(err);
+        res.json(rows);
+    });
+});
+
 // ==========================================
-// 3. POST /api/data (Sensor Data)
+// 3. POST /api/data (Menerima Data dari ESP & Mengirim Perintah)
 // ==========================================
 app.post('/api/data', (req, res) => {
     const { device, suhu, kelembaban, tekanan, gas_metana, syringe_present } = req.body;
@@ -145,24 +168,42 @@ app.post('/api/data', (req, res) => {
         return res.status(400).json({ status: "gagal", pesan: "Format data tidak valid" });
     }
 
-    // Registrasi/Update status device otomatis
+    // 1. Registrasi/Update status device jadi Online
     const upsertDevice = `INSERT INTO daftar_device (chamber_id, status, last_seen) VALUES (?, 'Online', NOW()) 
                           ON DUPLICATE KEY UPDATE status='Online', last_seen=NOW()`;
     db.query(upsertDevice, [device]);
 
-    const query = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana, syringe_present) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    // 2. Simpan Data Sensor
+    const insertDataQuery = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana, syringe_present) VALUES (?, ?, ?, ?, ?, ?, ?)';
     
-    db.query(query, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana, syringe_present || 0], (err, results) => {
+    db.query(insertDataQuery, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana, syringe_present || 0], (err, results) => {
         if (err) {
             console.error('\n[❌] Gagal menyimpan ke MySQL:', err.message);
             return res.status(500).json({ status: "gagal", pesan: err.message });
         }
         
         console.log(`\n[✅] Data berhasil masuk dari device: ${device}`);
-        console.log(`     - Suhu: ${suhu} | Kelembaban: ${kelembaban} | Tekanan: ${tekanan} | Gas: ${gas_metana}`);
-        console.log('-'.repeat(60));
         
-        res.json({ status: "berhasil", pesan: "Data tersimpan" });
+        // 3. Cek apakah ada antrean perintah untuk device ini
+        const checkCmdQuery = 'SELECT id, command_name, command_value FROM commands WHERE chamber_id = ? ORDER BY id ASC';
+        db.query(checkCmdQuery, [device], (err3, cmds) => {
+            if (err3 || cmds.length === 0) {
+                // Tidak ada perintah
+                return res.json({ status: "berhasil", pesan: "Data tersimpan", commands: [] });
+            }
+
+            // Jika ada perintah, hapus dari tabel lalu kirim ke ESP
+            const cmdIds = cmds.map(c => c.id);
+            const deleteCmdQuery = 'DELETE FROM commands WHERE id IN (?)';
+            db.query(deleteCmdQuery, [cmdIds], () => {
+                console.log(`[🚀] Mengirim ${cmds.length} perintah ke ${device}`);
+                return res.json({ 
+                    status: "berhasil", 
+                    pesan: "Data tersimpan, mengirim instruksi", 
+                    commands: cmds 
+                });
+            });
+        });
     });
 });
 

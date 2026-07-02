@@ -91,8 +91,8 @@ function buatCard(id) {
             <div class="ctrl-row">
                 <span><i class="bi bi-syringe text-secondary"></i> Syringe <span id="syringe-presence-${safeId}" class="badge bg-secondary" style="font-size:9px;">Cek</span></span>
                 <div class="btn-group-tiny">
-                    <button id="btn-up-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'UP')" disabled>UP</button>
-                    <button id="btn-down-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'DOWN')" disabled>DWN</button>
+                    <button id="btn-up-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'U')" disabled>UP</button>
+                    <button id="btn-down-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'D')" disabled>DWN</button>
                 </div>
             </div>
         </div>
@@ -230,8 +230,8 @@ async function bukaDetail(chamberId) {
     const btnDown = document.getElementById("detail-btn-down");
     
     if (kipasSwitch) kipasSwitch.onchange = () => toggleKipas(chamberId, kipasSwitch.id);
-    if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, safeId, 'UP');
-    if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, safeId, 'DOWN');
+    if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, safeId, 'U');
+    if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, safeId, 'D');
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetail'));
     modal.show();
@@ -533,7 +533,7 @@ async function toggleKipas(chamberId, safeId) {
     if(userRole !== "operator") return;
     const kipasToggle = document.getElementById(`kipas-${safeId}`);
     try {
-        const payload = [{ chamber_id: chamberId, command_name: "kipas", command_value: kipasToggle.checked ? "ON" : "OFF" }];
+        const payload = [{ chamber_id: chamberId, command_name: "Kipas", command_value: kipasToggle.checked ? "1" : "0" }];
         await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     } catch (error) {
         alert("Gagal menyalakan/mematikan kipas.");
@@ -549,7 +549,7 @@ async function moveSyringe(chamberId, safeId, direction) {
         return;
     }
     try {
-        const payload = [{ chamber_id: chamberId, command_name: "syringe", command_value: direction }];
+        const payload = [{ chamber_id: chamberId, command_name: "Syringe", command_value: direction }];
         await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     } catch (error) {
         alert("Gagal menggerakkan syringe.");
