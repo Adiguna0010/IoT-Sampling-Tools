@@ -56,7 +56,6 @@ function switchView(viewName) {
     
     // Matikan efek aktif di semua ikon navigasi
     document.getElementById("nav-dashboard").classList.remove("active");
-    if(document.getElementById("nav-database")) document.getElementById("nav-database").classList.remove("active");
     if(document.getElementById("nav-settings")) document.getElementById("nav-settings").classList.remove("active");
 
     // Nyalakan yang dipilih
@@ -75,11 +74,11 @@ function switchView(viewName) {
                 expChamber.innerHTML += `<option value="${ch}">${ch}</option>`;
             });
         }
-    } else if (viewName === 'database') {
-        // Tampilkan halaman database jika nanti dibuat
-        alert("Modul Master Data akan segera hadir!");
-        document.getElementById("view-dashboard").style.display = "block";
-        document.getElementById("nav-dashboard").classList.add("active");
+        
+        // Fetch server health if master admin
+        if(userRole === 'master_admin') {
+            fetchServerHealth();
+        }
     }
 }
 
@@ -719,9 +718,46 @@ async function exportDataCSV() {
     }
 }
 
+async function changeMyPassword() {
+    const oldPass = document.getElementById("cp-old").value;
+    const newPass = document.getElementById("cp-new").value;
+    if(!oldPass || !newPass) { alert("Harap isi kedua kolom password!"); return; }
+    
+    try {
+        const username = sessionStorage.getItem("username");
+        const res = await fetch(`http://localhost:3000/api/users/change-password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, old_password: oldPass, new_password: newPass })
+        });
+        const json = await res.json();
+        alert(json.pesan);
+        if(res.ok) {
+            document.getElementById("cp-old").value = '';
+            document.getElementById("cp-new").value = '';
+        }
+    } catch(e) { alert("Gagal mengubah password."); }
+}
+
+async function fetchServerHealth() {
+    try {
+        const res = await fetch('http://localhost:3000/api/system/health');
+        const data = await res.json();
+        document.getElementById("sh-cpu").innerText = data.cpu;
+        document.getElementById("sh-os").innerText = data.os;
+        document.getElementById("sh-ram").innerText = data.ram;
+        document.getElementById("sh-uptime").innerText = data.uptime;
+        document.getElementById("sh-data").innerText = data.total_data.toLocaleString('id-ID');
+        document.getElementById("sh-users").innerText = data.total_users;
+    } catch(e) {
+        document.getElementById("sh-uptime").innerText = "Server Error";
+    }
+}
+
 if (userRole !== 'master_admin') {
-    if(document.getElementById('btnKelolaUser')) document.getElementById('btnKelolaUser').style.display = 'none';
-    if(document.getElementById('dbCleanControl')) document.getElementById('dbCleanControl').style.display = 'none';
+    if(document.getElementById('accountManagementCard')) document.getElementById('accountManagementCard').style.display = 'none';
+    if(document.getElementById('databaseMaintenanceCard')) document.getElementById('databaseMaintenanceCard').style.display = 'none';
+    if(document.getElementById('serverHealthCard')) document.getElementById('serverHealthCard').style.display = 'none';
 }
 if (userRole === 'user') {
     if(document.getElementById('exportDataCard')) document.getElementById('exportDataCard').style.display = 'none';

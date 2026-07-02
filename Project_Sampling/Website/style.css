@@ -94,7 +94,8 @@ body {
     padding: 20px 20px 20px 0;
     height: 100vh;
     min-width: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* TOP TOOLBAR */

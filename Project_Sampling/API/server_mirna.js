@@ -1,5 +1,6 @@
 const express = require('express');
 const mysql = require('mysql2');
+const os = require('os');
 const app = express();
 const port = 3000;
 
@@ -240,6 +241,46 @@ app.put('/api/users/:id/reset-password', (req, res) => {
     db.query("UPDATE users SET password = ? WHERE id = ?", [newPass, req.params.id], (err) => {
         if (err) return res.status(500).json({ status: "gagal" });
         res.json({ status: "berhasil", pesan: `Sandi di-reset menjadi: ${newPass}` });
+    });
+});
+
+app.put('/api/users/change-password', (req, res) => {
+    const { username, old_password, new_password } = req.body;
+    db.query("SELECT * FROM users WHERE username = ? AND password = ?", [username, old_password], (err, results) => {
+        if (err) return res.status(500).json({ status: "gagal", pesan: "Kesalahan server" });
+        if (results.length === 0) return res.status(401).json({ status: "gagal", pesan: "Password lama salah!" });
+        
+        db.query("UPDATE users SET password = ? WHERE username = ?", [new_password, username], (err2) => {
+            if (err2) return res.status(500).json({ status: "gagal", pesan: "Gagal menyimpan password baru" });
+            res.json({ status: "berhasil", pesan: "Password berhasil diubah!" });
+        });
+    });
+});
+
+app.get('/api/system/health', (req, res) => {
+    const uptimeSeconds = process.uptime();
+    const hours = Math.floor(uptimeSeconds / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    
+    db.query("SELECT COUNT(*) as total FROM sensor_data", (err, resData) => {
+        db.query("SELECT COUNT(*) as total_users FROM users", (err2, resUser) => {
+            const totalData = err ? 0 : resData[0].total;
+            const totalUsers = err2 ? 0 : resUser[0].total_users;
+            
+            const freeMem = Math.round(os.freemem() / 1024 / 1024);
+            const totalMem = Math.round(os.totalmem() / 1024 / 1024);
+            const usedMem = totalMem - freeMem;
+            const cpuModel = os.cpus()[0].model;
+            
+            res.json({
+                uptime: `${hours} Jam ${minutes} Menit`,
+                total_data: totalData,
+                total_users: totalUsers,
+                ram: `${usedMem} MB / ${totalMem} MB Terpakai`,
+                cpu: cpuModel,
+                os: os.platform() === 'win32' ? 'Windows OS' : os.type()
+            });
+        });
     });
 });
 

@@ -16,7 +16,6 @@
     <aside class="sidebar-pill">
         <div class="logo-icon"><i class="bi bi-heptagon-fill"></i></div>
         <a href="#" class="active" id="nav-dashboard" onclick="switchView('dashboard')" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard Utama"><i class="bi bi-house-door-fill"></i></a>
-        <a href="#" id="nav-database" onclick="switchView('database')" data-bs-toggle="tooltip" data-bs-placement="right" title="Master Data (Segera)"><i class="bi bi-database"></i></a>
         <a href="#" id="nav-settings" onclick="switchView('settings')" data-bs-toggle="tooltip" data-bs-placement="right" title="Pengaturan Sistem"><i class="bi bi-sliders"></i></a>
         
         <div class="spacer"></div>
@@ -282,31 +281,7 @@
             <div class="pill fw-bold"><i class="bi bi-sliders text-primary"></i> Pengaturan Sistem</div>
         </header>
         
-        <div class="row">
-            <div class="col-md-6">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info"></i> Manajemen Akun</h5>
-                    <p class="text-muted small">Khusus Master Admin: Menyetujui pendaftaran baru dan menghapus pengguna.</p>
-                    <button class="btn btn-primary btn-sm" id="btnKelolaUser" data-bs-toggle="modal" data-bs-target="#modalKelolaUser">Buka Kelola User</button>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-database text-warning"></i> Pemeliharaan Database</h5>
-                    <p class="text-muted small">Bersihkan data log sensor usang untuk menjaga kecepatan server tetap optimal.</p>
-                    <div class="input-group input-group-sm mb-2" id="dbCleanControl">
-                        <select class="form-select" id="clean-days">
-                            <option value="30">Usia > 30 Hari</option>
-                            <option value="60">Usia > 60 Hari</option>
-                            <option value="90">Usia > 90 Hari</option>
-                        </select>
-                        <button class="btn btn-danger" onclick="cleanDatabase()"><i class="bi bi-trash"></i> Bersihkan</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4">
+        <div class="row mb-4">
             <div class="col-md-6" id="exportDataCard">
                 <div class="p-4 bg-white rounded-4 shadow-sm border">
                     <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-spreadsheet text-success"></i> Export Data CSV</h5>
@@ -328,6 +303,59 @@
                         </div>
                     </div>
                     <button class="btn btn-success btn-sm w-100" onclick="exportDataCSV()"><i class="bi bi-download"></i> Unduh Data Sensor</button>
+                </div>
+            </div>
+            <div class="col-md-6" id="changePasswordCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-key text-primary"></i> Ganti Password</h5>
+                    <p class="text-muted small">Ubah kata sandi Anda untuk keamanan akun pribadi.</p>
+                    <div class="mb-2">
+                        <input type="password" class="form-control form-control-sm" id="cp-old" placeholder="Password Lama">
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" class="form-control form-control-sm" id="cp-new" placeholder="Password Baru">
+                    </div>
+                    <button class="btn btn-primary btn-sm w-100" onclick="changeMyPassword()"><i class="bi bi-save"></i> Simpan Password</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6" id="accountManagementCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info"></i> Manajemen Akun</h5>
+                    <p class="text-muted small">Khusus Master Admin: Menyetujui pendaftaran baru dan menghapus pengguna.</p>
+                    <button class="btn btn-primary btn-sm" id="btnKelolaUser" data-bs-toggle="modal" data-bs-target="#modalKelolaUser">Buka Kelola User</button>
+                </div>
+            </div>
+            <div class="col-md-6" id="databaseMaintenanceCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-database text-warning"></i> Pemeliharaan Database</h5>
+                    <p class="text-muted small">Bersihkan data log sensor usang untuk menjaga kecepatan server tetap optimal.</p>
+                    <div class="input-group input-group-sm mb-2" id="dbCleanControl">
+                        <select class="form-select" id="clean-days">
+                            <option value="30">Lebih dari 30 Hari</option>
+                            <option value="60">Lebih dari 60 Hari</option>
+                            <option value="90">Lebih dari 90 Hari</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="cleanDatabase()">Bersihkan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6" id="serverHealthCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-server text-secondary"></i> Status Server</h5>
+                    <ul class="list-unstyled small text-muted mb-0">
+                        <li class="mb-1"><i class="bi bi-cpu me-2"></i> Prosesor: <span id="sh-cpu" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-windows me-2"></i> Sistem Operasi: <span id="sh-os" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-memory me-2"></i> Memori RAM: <span id="sh-ram" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-clock-history me-2"></i> Server Uptime: <span id="sh-uptime" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-database-fill me-2"></i> Total Data Sensor: <span id="sh-data" class="fw-bold text-dark">-</span> baris</li>
+                        <li><i class="bi bi-people-fill me-2"></i> Total Anggota: <span id="sh-users" class="fw-bold text-dark">-</span> pengguna</li>
+                    </ul>
                 </div>
             </div>
         </div>
