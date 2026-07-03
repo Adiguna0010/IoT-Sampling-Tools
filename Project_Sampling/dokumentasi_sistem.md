@@ -1,93 +1,115 @@
 # Dokumentasi Sistem: IoT Sampling Tools (Smart Chamber)
-**Tanggal Pembaruan Terakhir:** 2 Juli 2026
+**Tanggal Pembaruan Terakhir:** 3 Juli 2026
 
-Dokumen ini berisi panduan teknis yang merangkum struktur direktori, skema *database*, dan daftar *API Endpoint* untuk mempermudah pengembangan atau pemeliharaan sistem di masa mendatang.
+Dokumen ini adalah **Panduan Serah Terima (Handover Document)** untuk pengembang selanjutnya. Dokumen ini merangkum arsitektur, skema *database*, daftar *API Endpoint*, serta panduan *deployment* (hosting) agar programmer selanjutnya dapat memahami seluruh ekosistem tanpa kebingungan.
 
 ---
 
-## 📁 1. Struktur Proyek (`D:\Apalah\Project_Sampling`)
+## 🏛️ 1. Arsitektur Aplikasi (3-Tier)
 
-Proyek ini dipisahkan menjadi dua bagian utama (Frontend & Backend):
+Aplikasi ini menggunakan standar industri *3-Tier Architecture* (Klien, Server, Database):
+
+1. **Frontend (Klien):** Berupa file statis (HTML, CSS, Vanilla JS). Berfungsi sebagai wajah (*dashboard*) yang dapat merender pembaruan grafik dan angka secara real-time setiap 3 detik.
+2. **Backend (Server):** Berbasis **Node.js** dengan *framework* **Express.js**. Berfungsi sebagai *otak* yang menangani otentikasi, menarik data dari ESP, dan mengeksekusi otomatisasi jadwal setiap 30 detik.
+3. **Database:** Berbasis **MySQL** yang menyimpan log sensor, jadwal, dan akun pengguna.
 
 ```text
 Project_Sampling/
 │
-├── API/                        # 🔙 BACKEND (Node.js)
-│   └── server_mirna.js         # Script utama server API & koneksi MySQL
+├── API/                        # 🔙 BACKEND
+│   └── server_mirna.js         # Inti server Node.js (API REST & Webhook)
 │
-├── Website/                    # 🖥️ FRONTEND (HTML, CSS, JS)
+├── Website/                    # 🖥️ FRONTEND
 │   ├── index.html              # Halaman Login
-│   ├── dashboard.html          # Halaman Utama (Dashboard & Modal)
-│   ├── style.css               # Gaya tampilan (Glassmorphism & Layout)
-│   └── script.js               # Logika klien (Fetch API, Chart.js, Kontrol Modal)
+│   ├── dashboard.html          # Dashboard Utama (Cards, Settings, Modals)
+│   ├── style.css               # Desain UI (Responsive & Glassmorphism)
+│   └── script.js               # Logika Klien (Real-time Fetch, Promise.all, Chart.js)
 │
-├── dokumentasi_sistem.md       # File dokumentasi yang sedang Anda baca
-├── resume.md                   # Catatan histori progres pengembangan
-├── to-do.md                    # Daftar tugas integrasi ESP (Hardware)
-└── UDAHMALAM.ino               # Source code program Arduino/ESP32 (C++)
+├── Database/                   # 💾 DATABASE
+│   └── (File SQL jika ada)
+│
+├── dokumentasi_sistem.md       # Dokumentasi Utama
+├── resume.md                   # Catatan histori progres
+├── to-do.md                    # Daftar tugas ESP
+└── UDAHMALAM.ino               # Source code C++ untuk ESP32
 ```
 
 ---
 
-## 🗄️ 2. Struktur Database MySQL (`iot_padi`)
+## 🗄️ 2. Skema Database MySQL (`iot_padi`)
 
-Terdapat 5 tabel utama yang menjalankan seluruh ekosistem ini. Tabel 3, 4, dan 5 akan dibuat **secara otomatis** oleh Node.js jika belum ada di database.
+Backend memiliki kemampuan **Self-Healing / Auto-Migrate**. Artinya, jika tabel tertentu (seperti `users` atau kolom baru) belum ada, `server_mirna.js` akan otomatis membuatnya saat pertama kali dijalankan (cek blok *Patch/Migration* di awal kode server).
 
-### 1. `sensor_data` (Histori Nilai Sensor)
-*   **Fungsi:** Menyimpan riwayat bacaan sensor dari tiap alat.
-*   **Kolom Utama:** `id`, `nama_device` (contoh: Chamber 1), `suhu`, `kelembaban`, `tekanan`, `gas_metana`, `syringe_present` (0 = Kosong, 1 = Ada), `created_at`.
+### 1. `sensor_data` (Data Log Sensor)
+*   **Fungsi:** Menyimpan riwayat masif bacaan dari tiap ESP.
+*   **Struktur Utama:** `id`, `nama_device` (Chamber 1), `suhu`, `kelembaban`, `tekanan`, `gas_metana`, `syringe_present` (0/1), `created_at`.
 
-### 2. `commands` (Antrean Perintah Manual/Otomatis)
-*   **Fungsi:** Menampung tugas yang dikirim oleh pengguna dari web. ESP akan membaca tabel ini untuk menggerakkan kipas/motor.
-*   **Kolom Utama:** `id`, `chamber_id`, `command_name` (Kipas/Syringe), `command_value` (ON/OFF/UP/DOWN), `created_at`.
+### 2. `commands` (Antrean Perintah Hardware)
+*   **Fungsi:** Antrean instruksi. Web memasukkan perintah ke sini, lalu ESP menarik dan menghapusnya setelah dieksekusi.
+*   **Struktur Utama:** `id`, `chamber_id`, `command_name` (Kipas/Syringe), `command_value` (ON/OFF/UP/D), `created_at`.
 
-### 3. `daftar_device` (Manajemen Konektivitas)
-*   **Fungsi:** Menyimpan daftar ESP yang terdaftar dan melacak apakah alat tersebut sedang *Online* atau *Offline*.
-*   **Kolom Utama:** `chamber_id` (Primary Key), `status` (Online/Offline), `last_seen` (Terakhir kali mengirim data).
+### 3. `daftar_device` (Registry Konektivitas)
+*   **Fungsi:** Mencatat alat yang pernah terhubung dan status koneksinya (Batas toleransi offline = 5 menit).
+*   **Struktur Utama:** `chamber_id` (PK), `status` (Online/Offline), `last_seen`.
 
-### 4. `schedules` (Penjadwalan Otomatis)
-*   **Fungsi:** Menyimpan alarm tugas. Server (`server_mirna.js`) akan membacanya setiap 30 detik untuk mengeksekusi perintah pada waktu yang ditentukan.
-*   **Kolom Utama:** `id`, `chamber_id`, `command_name`, `command_value`, `scheduled_time` (Format HH:MM), `last_executed`.
+### 4. `schedules` (Penjadwalan Waktu Otomatis)
+*   **Fungsi:** Penyimpanan alarm. `server_mirna.js` melakukan *polling* ke tabel ini setiap 30 detik untuk mengeksekusi alat jika jam saat ini cocok dengan `scheduled_time`.
+*   **Struktur Utama:** `id`, `chamber_id`, `command_name`, `command_value`, `scheduled_time` (HH:MM), `last_executed`.
 
-### 5. `users` (Manajemen Pengguna)
-*   **Fungsi:** Menampung akun yang diperbolehkan *login* ke website.
-*   **Kolom Utama:** `id`, `username`, `password`, `role` ('operator' atau 'user').
+### 5. `users` (Otentikasi Akun)
+*   **Fungsi:** Menyimpan akun dengan level otorisasi yang berbeda. Sandi saat ini masih disimpan secara statis/plaintext (disarankan migrasi ke Bcrypt jika rilis ke publik).
+*   **Struktur Utama:** `id`, `username`, `password`, `role` ('master_admin', 'operator', 'user'), `is_approved` (0/1).
+
+---
+
+## 🔌 3. Endpoint API Lengkap (`http://localhost:3000`)
+
+### A. Autentikasi & Akun
+*   **`POST /api/login`**: Verifikasi login (menghasilkan *role*, *is_approved*).
+*   **`POST /api/register`**: Mendaftar akun baru (otomatis berstatus Pending/`is_approved=0`).
+*   **`PUT /api/users/change-password`**: Mengganti sandi mandiri (butuh sandi lama).
+*   **`GET /api/users`**: Mengambil daftar seluruh user *(Master Admin Only)*.
+*   **`PUT /api/users/:id/approve`**: Menyetujui user baru *(Master Admin)*.
+*   **`PUT /api/users/:id/role`**: Mengubah pangkat/role user *(Master Admin)*.
+*   **`PUT /api/users/:id/reset-password`**: Reset sandi paksa ke "12345" *(Master Admin)*.
+*   **`DELETE /api/users/:id`**: Menghapus akun *(Master Admin)*.
+
+### B. Lalu Lintas Sensor & Kontrol
+*   **`POST /api/data`**: Menerima JSON dari ESP32, otomatis update `last_seen` ke Online, dan mengecek `commands`.
+*   **`GET /api/data/latest/:device`**: Penarikan 1 data terbaru untuk satu Chamber (dipanggil web setiap 3 detik).
+*   **`GET /api/data/history/:device`**: Menarik 30 baris terakhir untuk di-render di tabel Log dan Chart Modal Detail.
+*   **`POST /api/commands`**: Mengirim (insert) tugas dari tombol web ke tabel antrean.
+
+### C. Analitik, Export & Kesehatan Server
+*   **`GET /api/system/health`**: Diagnostic API. Menarik RAM sisa, penggunaan CPU, OS, Uptime, Total User, dan Total Baris Data.
+*   **`GET /api/export`**: (Query params: `chamber`, `start`, `end`). Mengambil JSON data mentah berkapasitas besar untuk di-convert menjadi CSV di *client-side*.
+*   **`DELETE /api/database/clean`**: (Query params: `days`). Menghapus seluruh baris di `sensor_data` yang berumur di atas hari yang ditentukan.
+
+### D. Penjadwalan (Automation)
+*   **`GET /api/schedules/:device`**: Mengambil jadwal untuk di-*render* di Modal Jadwal.
+*   **`POST /api/schedules`**: Menyimpan jadwal baru.
+*   **`DELETE /api/schedules/:id`**: Menghapus jadwal.
 
 ---
 
-## 🔌 3. Daftar Endpoint API (`http://localhost:3000`)
+## 🚀 4. Panduan *Hosting* / *Deployment* (Production)
 
-Server Node.js mengekspos 10 *Endpoint API* berikut untuk komunikasi antara ESP dan Website:
+Jika sistem ini hendak dinaikkan ke internet global (VPS), ikuti aturan berikut:
 
-### A. Autentikasi & Keamanan
-1. **`POST /api/login`**
-   *   **Fungsi:** Memverifikasi *username* & *password* dari halaman Login. Mengembalikan JSON berisi *role* pengguna.
-
-### B. Komunikasi Alat (Dari ESP ke Server)
-2. **`POST /api/data`**
-   *   **Fungsi:** Menerima data JSON dari ESP. Otomatis menyimpan data ke `sensor_data` dan memperbarui stempel `last_seen` perangkat di `daftar_device` menjadi "Online".
-
-### C. Penarikan Data (Dari Server ke Website)
-3. **`GET /api/devices`**
-   *   **Fungsi:** Menarik seluruh daftar Chamber beserta status koneksinya (Untuk tabel *Overview*).
-4. **`GET /api/data/latest`**
-   *   **Fungsi:** Menarik 1 baris data sensor yang paling mutakhir secara *global* (Untuk grafik utama).
-5. **`GET /api/data/latest/:device`** *(Contoh: /api/data/latest/Chamber 1)*
-   *   **Fungsi:** Menarik data sensor terkini spesifik milik satu alat (Untuk angka di Kartu Chamber, diperbarui tiap 3 detik).
-6. **`GET /api/data/history/:device`**
-   *   **Fungsi:** Menarik 30 riwayat data log terakhir alat tertentu (Untuk Grafik dan Tabel di Popup Detail).
-
-### D. Eksekusi Perintah (Dari Website ke Server)
-7. **`POST /api/commands`**
-   *   **Fungsi:** Menyimpan perintah klik tombol dari Website (misal: Kipas ON) ke dalam tabel `commands`.
-
-### E. Penjadwalan Waktu (Otomasi)
-8. **`GET /api/schedules/:device`**
-   *   **Fungsi:** Menarik semua daftar jadwal alarm milik alat tertentu untuk dirender di tabel tab Otomatis.
-9. **`POST /api/schedules`**
-   *   **Fungsi:** Menyimpan alarm jadwal baru yang diketikkan pengguna di web ke dalam *database*.
-10. **`DELETE /api/schedules/:id`** *(Contoh: /api/schedules/5)*
-    *   **Fungsi:** Menghapus jadwal spesifik (berdasarkan ID) saat pengguna menekan tombol tong sampah.
+1. **Persiapan di Kode (Wajib):**
+   * Buka `Website/script.js`.
+   * Lakukan "Find and Replace" (Ctrl+H) untuk semua kata `http://localhost:3000`.
+   * Ganti dengan nama domain atau IP VPS tempat *backend* berada (misal: `https://api.domainkamu.com`).
+2. **Kebutuhan Server (VPS):**
+   * **Node.js & PM2:** *Backend* (`server_mirna.js`) harus dijalankan menggunakan Process Manager seperti PM2 (`pm2 start server_mirna.js`). Jangan gunakan `node` biasa karena server akan mati saat terminal SSH ditutup.
+   * **Nginx/Apache:** Folder `Website` harus dilayani oleh Web Server statis (Nginx) agar file `index.html` dapat diakses pengguna.
+   * **MySQL:** Impor struktur *database* ke MySQL di VPS, lalu ubah username/password di dalam file `server_mirna.js` (baris 13-17) agar sesuai dengan konfigurasi VPS.
 
 ---
-*Catatan: Pastikan XAMPP (MySQL) dan Node.js sudah berjalan sebelum mencoba API melalui Postman/Thunder Client.*
+
+## 🛠️ 5. Catatan Logika *Frontend* (`script.js`)
+
+Bagi programmer selanjutnya, perhatikan fitur unik di *Frontend*:
+* **Asynchronous Polling (Promise.all):** Fungsi `fetchData()` dijalankan setiap 3 detik oleh `setInterval`. Untuk menghindari penumpukan request jaringan jika ada 10 Chamber, kode mengambil data secara paralel menggunakan `Promise.all`.
+* **Global Aggregate Chart:** Grafik utama pada *Dashboard* **bukanlah** grafik 1 alat, melainkan kalkulasi **Rata-Rata (Average)** dari seluruh Chamber aktif yang terkoneksi.
+* **Dynamic Table Insertion:** Tabel *Log Activity* di dalam Detail Chamber menggunakan logika penyisipan baris di posisi pertama (`insertBefore`) dan menghapus baris terbawah jika sudah > 30 baris. Ini menjaga performa *browser* agar tidak mem-parsing ulang tabel keseluruhan.
