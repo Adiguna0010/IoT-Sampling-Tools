@@ -54,7 +54,7 @@
             </div>
 
             <div class="toolbar-group">
-                <div class="pill" title="User Aktif">
+                <div class="pill" title="Total Pengguna">
                     <i class="bi bi-people-fill text-info"></i> <span id="active-users-count">1</span>
                 </div>
                 <div class="pill pill-dark">
@@ -304,7 +304,7 @@
         
         <div class="row mb-4">
             <div class="col-md-6" id="exportDataCard">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
                     <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-spreadsheet text-success"></i> Export Data CSV</h5>
                     <p class="text-muted small">Unduh riwayat data sensor ke format CSV.</p>
                     <div class="mb-2">
@@ -327,7 +327,7 @@
                 </div>
             </div>
             <div class="col-md-6" id="changePasswordCard">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
                     <h5 class="fw-bold mb-3"><i class="bi bi-key text-primary"></i> Ganti Password</h5>
                     <p class="text-muted small">Ubah kata sandi Anda untuk keamanan akun pribadi.</p>
                     <div class="mb-2">
@@ -343,7 +343,7 @@
 
         <div class="row mb-4">
             <div class="col-md-6" id="accountManagementCard">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
                     <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info"></i> Manajemen Akun</h5>
                     <p class="text-muted small">Khusus Master Admin: Menyetujui pendaftaran baru dan menghapus pengguna.</p>
                     <button class="btn btn-primary btn-sm" id="btnKelolaUser" data-bs-toggle="modal" data-bs-target="#modalKelolaUser">Buka Kelola User</button>
@@ -367,7 +367,7 @@
         
         <div class="row mb-4">
             <div class="col-md-6" id="serverHealthCard">
-                <div class="p-4 bg-white rounded-4 shadow-sm border">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
                     <h5 class="fw-bold mb-3"><i class="bi bi-server text-secondary"></i> Status Server</h5>
                     <ul class="list-unstyled small text-muted mb-0">
                         <li class="mb-1"><i class="bi bi-cpu me-2"></i> Prosesor: <span id="sh-cpu" class="fw-bold text-dark">-</span></li>
@@ -377,6 +377,49 @@
                         <li class="mb-1"><i class="bi bi-database-fill me-2"></i> Total Data Sensor: <span id="sh-data" class="fw-bold text-dark">-</span> baris</li>
                         <li><i class="bi bi-people-fill me-2"></i> Total Anggota: <span id="sh-users" class="fw-bold text-dark">-</span> pengguna</li>
                     </ul>
+                </div>
+            </div>
+            
+            <div class="col-md-6" id="uiPreferencesCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-moon-stars-fill text-dark"></i> Preferensi Tampilan</h5>
+                    <p class="text-muted small">Aktifkan Mode Gelap (Dark Mode) agar lebih nyaman di malam hari.</p>
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" id="darkModeSwitch" onchange="toggleDarkMode()">
+                        <label class="form-check-label fw-bold" for="darkModeSwitch">Gunakan Mode Gelap</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12" id="thresholdCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Ambang Batas Sensor (Thresholds)</h5>
+                    <p class="text-muted small">Tentukan nilai ambang batas peringatan dini. Jika nilai sensor melewati batas ini, indikator kartu chamber akan menyala berdenyut merah.</p>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="enableThresholds" onchange="saveThresholds(false)" checked>
+                        <label class="form-check-label fw-bold text-dark" for="enableThresholds">Aktifkan Peringatan Ambang Batas</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-danger">Suhu Maks (°C)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-suhu" value="35">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-primary">Kelembapan Maks (%)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-kelembapan" value="80">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-success">Tekanan Min (hPa)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-tekanan" value="900">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-warning">Metana Maks (ppm)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-metana" value="2000">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm mt-3" onclick="saveThresholds()"><i class="bi bi-save"></i> Simpan Ambang Batas</button>
                 </div>
             </div>
         </div>
@@ -464,6 +507,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="script.js"></script>
     <script>
         // Inisialisasi Tooltip Bootstrap

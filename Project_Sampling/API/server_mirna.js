@@ -1,7 +1,17 @@
 const express = require('express');
 const mysql = require('mysql2');
 const os = require('os');
+const http = require('http');
+const { Server } = require('socket.io');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 const port = 3000;
 
 app.use(express.json());
@@ -323,7 +333,19 @@ app.post('/api/data', (req, res) => {
             return res.status(500).json({ status: "gagal", pesan: err.message });
         }
         
-        console.log(`\n[✅] Data berhasil masuk dari device: ${device}`);
+        console.log(`\n✅ Data berhasil masuk dari device: ${device} pada ${new Date().toLocaleTimeString('id-ID')}`);
+        
+        // --- WEBSOCKET BROADCAST ---
+        io.emit('newData', {
+            chamberId: device,
+            data: {
+                suhu: suhu,
+                kelembaban: kelembaban,
+                tekanan: tekanan,
+                gas_metana: gas_metana,
+                syringe_present: syringe_present
+            }
+        });
         
         // 3. Cek apakah ada antrean perintah untuk device ini
         const checkCmdQuery = 'SELECT id, command_name, command_value FROM commands WHERE chamber_id = ? ORDER BY id ASC';
@@ -452,6 +474,6 @@ app.delete('/api/schedules/:id', (req, res) => {
 // ==========================================
 // 4. MENYALAKAN SERVER
 // ==========================================
-app.listen(port, '0.0.0.0', () => {
-    console.log(`Server berjalan di http://0.0.0.0:${port} (Menerima koneksi dari semua IP)`);
+server.listen(port, '0.0.0.0', () => {
+    console.log(`Server & WebSocket berjalan di http://0.0.0.0:${port} (Menerima koneksi dari semua IP)`);
 });

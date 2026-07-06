@@ -32,7 +32,15 @@ window.onload = function() {
         roleBadge.className = "badge bg-secondary ms-2";
     }
 
-    document.getElementById("active-users-count").innerText = Math.floor(Math.random() * 3) + 1;
+    // Ambil Total Pengguna dari Database
+    fetch('http://localhost:3000/api/system/health')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("active-users-count").innerText = data.total_users;
+        })
+        .catch(() => {
+            document.getElementById("active-users-count").innerText = "-";
+        });
 
     // Sembunyikan kontrol yang bukan hak User biasa
     if (userRole === "user") {
@@ -46,6 +54,30 @@ window.onload = function() {
 
     initChart();
     load();
+    fetchWeather();
+
+    // Inisialisasi SortableJS untuk Drag and Drop Chamber Cards
+    const containerChamber = document.getElementById('containerChamber');
+    if (containerChamber) {
+        new Sortable(containerChamber, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function () {
+                // Saat selesai digeser, perbarui susunan array activeChambers
+                const newOrder = [];
+                document.querySelectorAll('#containerChamber .chamber-node').forEach(node => {
+                    newOrder.push(node.getAttribute('data-id'));
+                });
+                
+                // Simpan susunan baru ke array dan localStorage
+                activeChambers = newOrder;
+                localStorage.setItem('savedChambers', JSON.stringify(activeChambers));
+                
+                // Perbarui tabel overview agar urutannya sama
+                updateOverviewTable();
+            }
+        });
+    }
 }
 
 // Fungsi Navigasi Sidebar
@@ -95,15 +127,15 @@ function buatCard(id) {
             <div class="ctrl-row">
                 <span><i class="bi bi-fan text-secondary"></i> Kipas</span>
                 <label class="switch-mini">
-                    <input type="checkbox" id="kipas-${safeId}" onchange="toggleKipas('${id}', '${safeId}')">
+                    <input type="checkbox" id="kipas-${safeId}" onchange="toggleKipas('${id}', '${safeId}', this.checked, this)">
                     <span class="slider-mini"></span>
                 </label>
             </div>
             <div class="ctrl-row">
                 <span><i class="bi bi-syringe text-secondary"></i> Syringe <span id="syringe-presence-${safeId}" class="badge bg-secondary" style="font-size:9px;">Cek</span></span>
                 <div class="btn-group-tiny">
-                    <button id="btn-up-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'U')" disabled>UP</button>
-                    <button id="btn-down-${safeId}" onclick="moveSyringe('${id}', '${safeId}', 'D')" disabled>DWN</button>
+                    <button id="btn-up-${safeId}" onclick="moveSyringe('${id}', 'U')" disabled>UP</button>
+                    <button id="btn-down-${safeId}" onclick="moveSyringe('${id}', 'D')" disabled>DWN</button>
                 </div>
             </div>
         </div>
@@ -114,7 +146,7 @@ function buatCard(id) {
     `;
 
     return `
-    <div class="chamber-node">
+    <div class="chamber-node" data-id="${id}" style="cursor: grab;">
         <div class="node-header">
             <div class="node-icon"><i class="bi bi-cpu-fill"></i></div>
             <div class="node-title">${id}</div>
@@ -239,10 +271,9 @@ async function bukaDetail(chamberId) {
     const kipasSwitch = document.getElementById("detail-kipas-switch");
     const btnUp = document.getElementById("detail-btn-up");
     const btnDown = document.getElementById("detail-btn-down");
-    
-    if (kipasSwitch) kipasSwitch.onchange = () => toggleKipas(chamberId, kipasSwitch.id);
-    if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, safeId, 'U');
-    if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, safeId, 'D');
+        if (kipasSwitch) kipasSwitch.onchange = () => toggleKipas(chamberId, null, kipasSwitch.checked, kipasSwitch);
+        if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, 'U');
+        if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, 'D');
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetail'));
     modal.show();
@@ -339,8 +370,15 @@ async function loadJadwal() {
         if (json.status === "berhasil" && json.data.length > 0) {
             let html = "";
             json.data.forEach(item => {
+                let displayValue = item.command_value;
+                if (item.command_name.toLowerCase() === 'kipas') {
+                    displayValue = item.command_value == '1' ? 'ON' : 'OFF';
+                } else if (item.command_name.toLowerCase() === 'syringe') {
+                    displayValue = item.command_value === 'U' ? 'UP' : 'DOWN';
+                }
+
                 html += `<tr>
-                    <td class="text-start">${item.command_name.toUpperCase()} ${item.command_value}</td>
+                    <td class="text-start">${item.command_name.toUpperCase()} ${displayValue}</td>
                     <td class="fw-bold text-primary">${item.scheduled_time}</td>
                     <td><button class="btn btn-sm text-danger p-0" onclick="hapusJadwal(${item.id})"><i class="bi bi-trash"></i></button></td>
                 </tr>`;
@@ -442,8 +480,12 @@ setInterval(() => {
 
 // API Cuaca
 async function fetchWeather() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // Batas waktu 5 detik
+    
     try {
-        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current_weather=true');
+        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current_weather=true', { signal: controller.signal });
+        clearTimeout(timeoutId);
         const result = await response.json();
         if(result.current_weather) {
             let icon = "☀️";
@@ -453,10 +495,9 @@ async function fetchWeather() {
             document.getElementById("cuaca").innerHTML = `${icon} ${result.current_weather.temperature}°C`;
         }
     } catch (e) {
-        document.getElementById("cuaca").innerHTML = `Gagal`;
+        document.getElementById("cuaca").innerHTML = `Gagal Memuat Cuaca`;
     }
 }
-fetchWeather();
 
 // ==========================================
 // 3. API DATA & KONTROL (FETCH KE LOCALHOST)
@@ -537,6 +578,9 @@ async function fetchData() {
                 document.getElementById(`tekanan-${safeId}`).innerText = `${data.tekanan} hPa`;
                 document.getElementById(`metana-${safeId}`).innerText = `${data.gas_metana} ppm`;
                 
+                // Cek apakah melewati ambang batas
+                checkThresholds(chamberId, data);
+                
                 if (userRole !== "user") {
                     let isPresent = data.syringe_present || 0; 
                     const presenceBadge = document.getElementById(`syringe-presence-${safeId}`);
@@ -579,7 +623,7 @@ async function fetchData() {
                                     historyChartInstance.data.labels.shift();
                                     historyChartInstance.data.datasets.forEach(dataset => dataset.data.shift());
                                 }
-                                historyChartInstance.update();
+                                historyChartInstance.update('none');
                             }
                             
                             // Update Tabel Log secara real-time
@@ -640,36 +684,55 @@ async function fetchData() {
             myChart.data.labels.shift();
             myChart.data.datasets.forEach(dataset => dataset.data.shift());
         }
-        myChart.update();
+        myChart.update('none');
     }
 }
 
-setInterval(fetchData, 3000);
+// Inisialisasi WebSocket
+const socket = io('http://localhost:3000');
+socket.on('newData', (payload) => {
+    // Saat mendapat sinyal data baru dari server, kita cukup memanggil fetchData
+    // karena fetchData sudah menangani update UI dan update Global Chart dengan rata-rata.
+    // Hal ini menyingkirkan interval 3 detik, sehingga request hanya terjadi saat benar-benar ada data baru.
+    fetchData();
+});
 
-async function toggleKipas(chamberId, safeId) {
+async function toggleKipas(chamberId, safeId, isChecked, toggleElement) {
     if(userRole === "user") return;
-    const kipasToggle = document.getElementById(`kipas-${safeId}`);
     try {
-        const payload = [{ chamber_id: chamberId, command_name: "Kipas", command_value: kipasToggle.checked ? "1" : "0" }];
-        await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const payload = [{ chamber_id: chamberId, command_name: "Kipas", command_value: isChecked ? "1" : "0" }];
+        const res = await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error("Server error");
+        
+        // Sinkronkan toggle lain jika berhasil
+        if (safeId && toggleElement.id === `kipas-${safeId}`) {
+            const detailSwitch = document.getElementById("detail-kipas-switch");
+            if (detailSwitch && currentDetailChamber === chamberId) detailSwitch.checked = isChecked;
+        } else if (toggleElement.id === "detail-kipas-switch") {
+            const safe = chamberId.replace(/\s+/g, '-');
+            const cardSwitch = document.getElementById(`kipas-${safe}`);
+            if (cardSwitch) cardSwitch.checked = isChecked;
+        }
     } catch (error) {
-        alert("Gagal menyalakan/mematikan kipas.");
-        kipasToggle.checked = !kipasToggle.checked;
+        alert("Gagal menyalakan/mematikan kipas. Pastikan koneksi server aktif.");
+        if(toggleElement) toggleElement.checked = !isChecked;
     }
 }
 
-async function moveSyringe(chamberId, safeId, direction) {
+async function moveSyringe(chamberId, direction) {
     if(userRole === "user") return;
-    const presenceBadge = document.getElementById(`syringe-presence-${safeId}`).innerText;
+    const safeId = chamberId.replace(/\s+/g, '-');
+    const presenceBadge = document.getElementById(`syringe-presence-${safeId}`) ? document.getElementById(`syringe-presence-${safeId}`).innerText : "Kosong";
     if (presenceBadge === "Kosong" || presenceBadge === "Cek") {
         alert("ERROR: Tidak ada syringe terdeteksi di alat!");
         return;
     }
     try {
         const payload = [{ chamber_id: chamberId, command_name: "Syringe", command_value: direction }];
-        await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const res = await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error("Server error");
     } catch (error) {
-        alert("Gagal menggerakkan syringe.");
+        alert("Gagal menggerakkan syringe. Pastikan koneksi server aktif.");
     }
 }
 
@@ -887,4 +950,85 @@ if (userRole !== 'master_admin') {
 }
 if (userRole === 'user') {
     if(document.getElementById('exportDataCard')) document.getElementById('exportDataCard').style.display = 'none';
+}
+
+// --- DARK MODE LOGIC ---
+function toggleDarkMode() {
+    const isDark = document.getElementById('darkModeSwitch').checked;
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+        localStorage.setItem('darkMode', 'true');
+    } else {
+        document.body.classList.remove('dark-mode');
+        localStorage.setItem('darkMode', 'false');
+    }
+}
+
+// Restore dark mode on load
+if (localStorage.getItem('darkMode') === 'true') {
+    document.body.classList.add('dark-mode');
+    window.addEventListener('DOMContentLoaded', () => {
+        const darkModeSwitch = document.getElementById('darkModeSwitch');
+        if(darkModeSwitch) darkModeSwitch.checked = true;
+    });
+}
+
+// --- THRESHOLD LOGIC ---
+let thresholds = JSON.parse(localStorage.getItem('sensorThresholds')) || {
+    enabled: true,
+    suhu: 35,
+    kelembapan: 80,
+    tekanan: 900,
+    metana: 2000
+};
+
+// Restore UI values
+window.addEventListener('DOMContentLoaded', () => {
+    if(document.getElementById('enableThresholds')) document.getElementById('enableThresholds').checked = thresholds.enabled;
+    if(document.getElementById('thresh-suhu')) document.getElementById('thresh-suhu').value = thresholds.suhu;
+    if(document.getElementById('thresh-kelembapan')) document.getElementById('thresh-kelembapan').value = thresholds.kelembapan;
+    if(document.getElementById('thresh-tekanan')) document.getElementById('thresh-tekanan').value = thresholds.tekanan;
+    if(document.getElementById('thresh-metana')) document.getElementById('thresh-metana').value = thresholds.metana;
+});
+
+function saveThresholds(showPopup = true) {
+    thresholds = {
+        enabled: document.getElementById('enableThresholds') ? document.getElementById('enableThresholds').checked : true,
+        suhu: parseFloat(document.getElementById('thresh-suhu').value) || 35,
+        kelembapan: parseFloat(document.getElementById('thresh-kelembapan').value) || 80,
+        tekanan: parseFloat(document.getElementById('thresh-tekanan').value) || 900,
+        metana: parseFloat(document.getElementById('thresh-metana').value) || 2000
+    };
+    localStorage.setItem('sensorThresholds', JSON.stringify(thresholds));
+    
+    // Matikan alert seketika jika dinonaktifkan
+    if(!thresholds.enabled) {
+        document.querySelectorAll('.chamber-node.alert-glow').forEach(el => el.classList.remove('alert-glow'));
+    }
+    
+    if (showPopup) {
+        alert("Pengaturan Ambang Batas berhasil disimpan!");
+    }
+}
+
+function checkThresholds(chamberId, data) {
+    const card = document.querySelector(`.chamber-node[data-id="${chamberId}"]`);
+    if (!card) return;
+    
+    if (!thresholds.enabled) {
+        card.classList.remove('alert-glow');
+        return;
+    }
+    
+    let hasAlert = false;
+    if (parseFloat(data.suhu) > thresholds.suhu) hasAlert = true;
+    if (parseFloat(data.kelembaban) > thresholds.kelembapan) hasAlert = true;
+    if (parseFloat(data.tekanan) < thresholds.tekanan) hasAlert = true; // Tekanan biasanya drop jika bahaya
+    if (parseFloat(data.gas_metana) > thresholds.metana) hasAlert = true;
+    
+    if (hasAlert) {
+        card.classList.add('alert-glow');
+    } else {
+        card.classList.remove('alert-glow');
+    }
 }
