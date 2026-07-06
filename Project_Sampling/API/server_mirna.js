@@ -472,7 +472,21 @@ app.delete('/api/schedules/:id', (req, res) => {
 });
 
 // ==========================================
-// 4. MENYALAKAN SERVER
+// 8. API CUACA (Proxy)
+// ==========================================
+app.get('/api/weather', async (req, res) => {
+    try {
+        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-7.7956&longitude=110.3695&current_weather=true');
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error("Gagal mengambil data cuaca:", error.message);
+        res.status(500).json({ status: "gagal", pesan: error.message });
+    }
+});
+
+// ==========================================
+// 9. MENYALAKAN SERVER
 // ==========================================
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server & WebSocket berjalan di http://0.0.0.0:${port} (Menerima koneksi dari semua IP)`);

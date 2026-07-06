@@ -1,115 +1,91 @@
-# Dokumentasi Sistem: IoT Sampling Tools (Smart Chamber)
-**Tanggal Pembaruan Terakhir:** 3 Juli 2026
+# 📖 Buku Panduan Sistem: IoT Smart Chamber
 
-Dokumen ini adalah **Panduan Serah Terima (Handover Document)** untuk pengembang selanjutnya. Dokumen ini merangkum arsitektur, skema *database*, daftar *API Endpoint*, serta panduan *deployment* (hosting) agar programmer selanjutnya dapat memahami seluruh ekosistem tanpa kebingungan.
+**Diperbarui pada:** 6 Juli 2026
+
+Buku panduan ini disusun khusus untuk **semua kalangan**. Kami membagi dokumen ini menjadi 3 bagian agar dapat dipahami sesuai dengan latar belakang pembacanya: Orang Awam, Teknisi Lapangan/Jaringan, dan Programmer.
 
 ---
 
-## 🏛️ 1. Arsitektur Aplikasi (3-Tier)
+## 🟢 BAGIAN 1: UNTUK ORANG AWAM (PENGGUNA UMUM)
+*Baca bagian ini jika Anda hanya ingin tahu apa fungsi alat ini dan bagaimana gambaran besar cara kerjanya.*
 
-Aplikasi ini menggunakan standar industri *3-Tier Architecture* (Klien, Server, Database):
+**Apa itu IoT Smart Chamber?**
+Bayangkan Anda memiliki sebuah kotak kaca (Chamber) untuk penelitian tanaman atau gas. Anda ingin tahu suhu dan kadar gas di dalamnya setiap detik, dan Anda juga ingin bisa menyalakan kipas di dalamnya tanpa harus berjalan ke luar rumah. Sistem inilah solusinya!
 
-1. **Frontend (Klien):** Berupa file statis (HTML, CSS, Vanilla JS). Berfungsi sebagai wajah (*dashboard*) yang dapat merender pembaruan grafik dan angka secara real-time setiap 3 detik.
-2. **Backend (Server):** Berbasis **Node.js** dengan *framework* **Express.js**. Berfungsi sebagai *otak* yang menangani otentikasi, menarik data dari ESP, dan mengeksekusi otomatisasi jadwal setiap 30 detik.
-3. **Database:** Berbasis **MySQL** yang menyimpan log sensor, jadwal, dan akun pengguna.
+**Bagaimana Cara Kerjanya?**
+Sistem ini membagi tugasnya kepada 3 peran sederhana:
+1. **Pekerja Lapangan (Alat Fisik / ESP32):** Alat yang dipasang di dalam kotak (Chamber). Tugasnya mencatat suhu dan gas, lalu melaporkannya ke komputer pusat setiap saat. Ia juga punya tangan mekanik (Motor Syringe dan Kipas) yang siap bergerak jika disuruh.
+2. **Otak & Ingatan (Server Komputer):** Komputer pusat yang menerima laporan dari para "Pekerja Lapangan". Otak ini mengingat semua laporan di buku catatannya (Database) agar tidak hilang.
+3. **Layar Remote Control (Website):** Ini adalah layar di HP atau laptop Anda. Layar ini menampilkan laporan dari "Otak" berupa grafik yang indah. Di sini juga terdapat tombol-tombol. Jika Anda menekan tombol "Nyalakan Kipas", layar akan memberitahu Otak, lalu Otak akan menyuruh Pekerja Lapangan untuk memutar kipas tersebut.
 
+---
+
+## 🟡 BAGIAN 2: UNTUK TEKNISI (HARDWARE & NETWORKING)
+*Baca bagian ini jika Anda bertugas memasang alat fisik, merakit jaringan, atau menangani masalah konektivitas server.*
+
+**1. Topologi Jaringan & Komunikasi**
+*   **Alat ESP32** harus terhubung ke jaringan *WiFi* yang memiliki akses ke alamat IP Server.
+*   Protokol yang digunakan oleh ESP32 untuk mengirim data sensor adalah **HTTP POST Request** (mengirim file JSON berisi data suhu, gas, dll).
+*   Protokol ESP32 untuk menerima perintah bukanlah *real-time push*. Melainkan, setelah ESP32 sukses mengirim data HTTP POST, ia akan membaca balasan (Response) dari Server. Jika di dalam balasan itu ada selipan perintah (misal: `"command_value": "1"`), maka Relay/Motor akan langsung dieksekusi.
+
+**2. Arsitektur Komponen Server**
+*   **Database (MySQL):** Berjalan di atas aplikasi XAMPP (Port standar 3306). Menyimpan log ratusan ribu baris data.
+*   **Backend (Node.js):** Harus dijalankan lewat terminal/CMD di komputer server. Berjalan pada port `3000`. Jika server ini mati, alat tidak akan bisa mengirim data dan Website akan menampilkan status *Offline*.
+
+**3. Trouble-shooting Cepat:**
+*   **Jika Website menampilkan "Offline":** Berarti ESP32 mati, atau WiFi ESP32 putus, atau IP Server berubah sehingga ESP32 salah alamat.
+*   **Jika Kipas Ditekan tapi Tidak Menyala:** Pastikan Relay kipas tersambung dengan benar ke Pin ESP32. Pastikan perintah dari server tidak terhalang *Firewall* jaringan (Matikan Windows Defender Firewall di Komputer Server jika diperlukan).
+
+---
+
+## 🔴 BAGIAN 3: UNTUK PROGRAMMER (SOFTWARE DEVELOPER)
+*Baca bagian ini jika Anda bertugas membaca, memodifikasi, atau mengembangkan kode aplikasi ini secara mendalam.*
+
+Sistem ini menganut standar arsitektur *3-Tier* yang digabungkan dengan komunikasi *Real-Time* menggunakan *WebSocket*. Berikut adalah bedah sistem yang mendalam agar Anda dapat memahami alur *coding* secara penuh:
+
+### 1. Struktur & Ekosistem Folder
 ```text
 Project_Sampling/
-│
-├── API/                        # 🔙 BACKEND
-│   └── server_mirna.js         # Inti server Node.js (API REST & Webhook)
-│
-├── Website/                    # 🖥️ FRONTEND
-│   ├── index.html              # Halaman Login
-│   ├── dashboard.html          # Dashboard Utama (Cards, Settings, Modals)
-│   ├── style.css               # Desain UI (Responsive & Glassmorphism)
-│   └── script.js               # Logika Klien (Real-time Fetch, Promise.all, Chart.js)
-│
-├── Database/                   # 💾 DATABASE
-│   └── (File SQL jika ada)
-│
-├── dokumentasi_sistem.md       # Dokumentasi Utama
-├── resume.md                   # Catatan histori progres
-├── to-do.md                    # Daftar tugas ESP
-└── UDAHMALAM.ino               # Source code C++ untuk ESP32
+├── API/
+│   ├── server_mirna.js         # Entry point NodeJS (Logic API, Webhook ESP, & Socket.io)
+│   ├── package.json            # Dependencies (express, mysql2, socket.io, cors)
+├── Website/
+│   ├── index.html              # Entry point UI (Login screen)
+│   ├── dashboard.html          # View Dashboard utama (DOM dimanipulasi oleh script.js)
+│   ├── style.css               # Styling Vanilla CSS (Glassmorphism, Variables)
+│   ├── script.js               # Core logic Klien (Fetch, Chart.js, Socket Client)
+├── sketch_jul4a.ino            # Kode sumber Firmware ESP32 (C/C++ Arduino)
 ```
 
----
+### 2. Skema & Auto-Migration Database (MySQL)
+Database yang digunakan bernama `iot_padi`. Kode Node.js memiliki fungsi *Self-Healing Schema*; ketika `server_mirna.js` dijalankan, ia mengeksekusi `CREATE TABLE IF NOT EXISTS` sehingga *database* akan membangun dirinya sendiri tanpa perlu *import* file SQL.
 
-## 🗄️ 2. Skema Database MySQL (`iot_padi`)
+**Daftar Tabel Penting:**
+1. **`sensor_data`**: Tabel log raksasa (*append-only*). Menyimpan aliran data suhu, kelembaban, tekanan, dan gas metana. Diberi indeks pada kolom `created_at` untuk mempercepat proses *query* grafik.
+2. **`commands`**: Berperan sebagai **Message Broker / Queue Table** (Tabel Antrean). Saat *User* mengeklik tombol dari web, perintah (seperti Kipas=1) di-insert ke sini. Saat ESP32 melakukan *ping* POST, Node.js menarik baris dari tabel ini, mengirimkannya sebagai JSON `response` ke ESP32, lalu **menghapus baris tersebut (DELETE)** agar tidak dieksekusi berulang kali.
+3. **`daftar_device`**: *Registry* alat (Chamber 1, Chamber 2, dst). Memiliki kolom `last_seen`. Kapanpun Node.js menerima data dari Chamber tersebut, `last_seen` diperbarui ke jam saat ini (NOW()). Website akan melabeli alat "Offline" jika `last_seen` tertinggal lebih dari 5 menit dari waktu saat ini.
+4. **`schedules`**: Tabel penyimpanan baris penjadwalan otomatis (*CRON Job DB*).
 
-Backend memiliki kemampuan **Self-Healing / Auto-Migrate**. Artinya, jika tabel tertentu (seperti `users` atau kolom baru) belum ada, `server_mirna.js` akan otomatis membuatnya saat pertama kali dijalankan (cek blok *Patch/Migration* di awal kode server).
+### 3. Komunikasi Dua Arah (Socket.io vs HTTP REST)
+Sistem ini menggunakan **Hybrid Communication**:
+*   **ESP32 ke Server (Murni HTTP REST):**
+    ESP32 *TIDAK* menggunakan MQTT atau WebSocket. ESP32 mengandalkan metode `HTTP POST /api/data` setiap beberapa detik. Hal ini dipilih agar manajemen memori di ESP32 ringan dan toleran terhadap koneksi internet yang putus-nyambung. Server Node.js menangkap *request* ini, mem-parsing datanya, dan menyimpannya ke MySQL.
+*   **Server ke Klien / Website (Murni WebSocket):**
+    Pada versi lama, website melakukan `setInterval` HTTP GET setiap 3 detik. Pendekatan usang ini membebani memori (*memory leak*) browser dan server. Saat ini, kita memakai **Socket.io**.
+    Begitu *router* `/api/data` milik Node.js selesai menyimpan data ESP ke MySQL, ia langsung menembakkan instruksi `io.emit('newData', data)` ke seluruh Browser yang sedang membuka halaman dashboard. File `script.js` Klien memiliki *listener* `socket.on('newData')` yang langsung memperbarui teks suhu dan menggeser titik grafik (*Chart.js*) tanpa proses memuat ulang HTTP sama sekali.
 
-### 1. `sensor_data` (Data Log Sensor)
-*   **Fungsi:** Menyimpan riwayat masif bacaan dari tiap ESP.
-*   **Struktur Utama:** `id`, `nama_device` (Chamber 1), `suhu`, `kelembaban`, `tekanan`, `gas_metana`, `syringe_present` (0/1), `created_at`.
+### 4. Arsitektur Firmware ESP32 (FreeRTOS Dual-Core)
+Kode `sketch_jul4a.ino` berjalan di ESP32 (Chip *Dual-Core*). Kita membagi tugas secara paksa (*pin-to-core*) menggunakan library *FreeRTOS*:
+*   **Core 0 (Task Sensor & WiFi):** Bertugas membaca sensor BME dan MQ, menyusun paket JSON, dan melakukan HTTP POST ke Node.js secara rekursif (*looping* terus menerus tanpa blokade). Saat Core 0 menerima respon HTTP dari server, ia akan mem-*parsing* respon tersebut mencari *string* `"command_value":"1"`, dan mengeksekusi fungsi lokal `prosesPerintah()`.
+*   **Core 1 (Task Hardware Controller):** Loop bawaan Arduino `loop()` berjalan di sini. Bertugas mengeksekusi instruksi motor *stepper* tinggi presisi (menarik *syringe*) menggunakan sinyal *Pulse* digital. Karena terpisah di Core 1, gerakan motor akan sangat mulus tanpa terinterupsi jeda *loading WiFi* di Core 0.
 
-### 2. `commands` (Antrean Perintah Hardware)
-*   **Fungsi:** Antrean instruksi. Web memasukkan perintah ke sini, lalu ESP menarik dan menghapusnya setelah dieksekusi.
-*   **Struktur Utama:** `id`, `chamber_id`, `command_name` (Kipas/Syringe), `command_value` (ON/OFF/UP/D), `created_at`.
+### 5. Detail Mekanisme Keamanan & Proxy Cuaca
+*   **Proxy API Cuaca:** Frontend Website tidak dibolehkan menembak langsung URL *Open-Meteo* (`https://api.open-meteo.com/v1/...`). Hal ini dilakukan karena kebijakan *CORS* (Cross-Origin) browser, atau gangguan dari *Ad-Blocker/Firewall* perusahaan. Solusinya, JS Frontend hanya memanggil endpoint lokal `http://localhost:3000/api/weather`. Node.js di server akan bertindak sebagai agen perantara (Proxy) yang mengambil data asli dari Open-Meteo menggunakan `fetch()` lalu menampilkannya utuh kembali ke klien.
+*   **Local Storage Threshold:** Fitur "Ambang Batas" (berkedip merah jika suhu tinggi) *tidak dievaluasi di sisi server*, melainkan dievaluasi di sisi *Browser (Klien)*. Ambang batas yang disetel pengguna akan disimpan dalam `localStorage` Browser. Keuntungannya: Tidak menambah beban komputasi server.
 
-### 3. `daftar_device` (Registry Konektivitas)
-*   **Fungsi:** Mencatat alat yang pernah terhubung dan status koneksinya (Batas toleransi offline = 5 menit).
-*   **Struktur Utama:** `chamber_id` (PK), `status` (Online/Offline), `last_seen`.
-
-### 4. `schedules` (Penjadwalan Waktu Otomatis)
-*   **Fungsi:** Penyimpanan alarm. `server_mirna.js` melakukan *polling* ke tabel ini setiap 30 detik untuk mengeksekusi alat jika jam saat ini cocok dengan `scheduled_time`.
-*   **Struktur Utama:** `id`, `chamber_id`, `command_name`, `command_value`, `scheduled_time` (HH:MM), `last_executed`.
-
-### 5. `users` (Otentikasi Akun)
-*   **Fungsi:** Menyimpan akun dengan level otorisasi yang berbeda. Sandi saat ini masih disimpan secara statis/plaintext (disarankan migrasi ke Bcrypt jika rilis ke publik).
-*   **Struktur Utama:** `id`, `username`, `password`, `role` ('master_admin', 'operator', 'user'), `is_approved` (0/1).
-
----
-
-## 🔌 3. Endpoint API Lengkap (`http://localhost:3000`)
-
-### A. Autentikasi & Akun
-*   **`POST /api/login`**: Verifikasi login (menghasilkan *role*, *is_approved*).
-*   **`POST /api/register`**: Mendaftar akun baru (otomatis berstatus Pending/`is_approved=0`).
-*   **`PUT /api/users/change-password`**: Mengganti sandi mandiri (butuh sandi lama).
-*   **`GET /api/users`**: Mengambil daftar seluruh user *(Master Admin Only)*.
-*   **`PUT /api/users/:id/approve`**: Menyetujui user baru *(Master Admin)*.
-*   **`PUT /api/users/:id/role`**: Mengubah pangkat/role user *(Master Admin)*.
-*   **`PUT /api/users/:id/reset-password`**: Reset sandi paksa ke "12345" *(Master Admin)*.
-*   **`DELETE /api/users/:id`**: Menghapus akun *(Master Admin)*.
-
-### B. Lalu Lintas Sensor & Kontrol
-*   **`POST /api/data`**: Menerima JSON dari ESP32, otomatis update `last_seen` ke Online, dan mengecek `commands`.
-*   **`GET /api/data/latest/:device`**: Penarikan 1 data terbaru untuk satu Chamber (dipanggil web setiap 3 detik).
-*   **`GET /api/data/history/:device`**: Menarik 30 baris terakhir untuk di-render di tabel Log dan Chart Modal Detail.
-*   **`POST /api/commands`**: Mengirim (insert) tugas dari tombol web ke tabel antrean.
-
-### C. Analitik, Export & Kesehatan Server
-*   **`GET /api/system/health`**: Diagnostic API. Menarik RAM sisa, penggunaan CPU, OS, Uptime, Total User, dan Total Baris Data.
-*   **`GET /api/export`**: (Query params: `chamber`, `start`, `end`). Mengambil JSON data mentah berkapasitas besar untuk di-convert menjadi CSV di *client-side*.
-*   **`DELETE /api/database/clean`**: (Query params: `days`). Menghapus seluruh baris di `sensor_data` yang berumur di atas hari yang ditentukan.
-
-### D. Penjadwalan (Automation)
-*   **`GET /api/schedules/:device`**: Mengambil jadwal untuk di-*render* di Modal Jadwal.
-*   **`POST /api/schedules`**: Menyimpan jadwal baru.
-*   **`DELETE /api/schedules/:id`**: Menghapus jadwal.
-
----
-
-## 🚀 4. Panduan *Hosting* / *Deployment* (Production)
-
-Jika sistem ini hendak dinaikkan ke internet global (VPS), ikuti aturan berikut:
-
-1. **Persiapan di Kode (Wajib):**
-   * Buka `Website/script.js`.
-   * Lakukan "Find and Replace" (Ctrl+H) untuk semua kata `http://localhost:3000`.
-   * Ganti dengan nama domain atau IP VPS tempat *backend* berada (misal: `https://api.domainkamu.com`).
-2. **Kebutuhan Server (VPS):**
-   * **Node.js & PM2:** *Backend* (`server_mirna.js`) harus dijalankan menggunakan Process Manager seperti PM2 (`pm2 start server_mirna.js`). Jangan gunakan `node` biasa karena server akan mati saat terminal SSH ditutup.
-   * **Nginx/Apache:** Folder `Website` harus dilayani oleh Web Server statis (Nginx) agar file `index.html` dapat diakses pengguna.
-   * **MySQL:** Impor struktur *database* ke MySQL di VPS, lalu ubah username/password di dalam file `server_mirna.js` (baris 13-17) agar sesuai dengan konfigurasi VPS.
-
----
-
-## 🛠️ 5. Catatan Logika *Frontend* (`script.js`)
-
-Bagi programmer selanjutnya, perhatikan fitur unik di *Frontend*:
-* **Asynchronous Polling (Promise.all):** Fungsi `fetchData()` dijalankan setiap 3 detik oleh `setInterval`. Untuk menghindari penumpukan request jaringan jika ada 10 Chamber, kode mengambil data secara paralel menggunakan `Promise.all`.
-* **Global Aggregate Chart:** Grafik utama pada *Dashboard* **bukanlah** grafik 1 alat, melainkan kalkulasi **Rata-Rata (Average)** dari seluruh Chamber aktif yang terkoneksi.
-* **Dynamic Table Insertion:** Tabel *Log Activity* di dalam Detail Chamber menggunakan logika penyisipan baris di posisi pertama (`insertBefore`) dan menghapus baris terbawah jika sudah > 30 baris. Ini menjaga performa *browser* agar tidak mem-parsing ulang tabel keseluruhan.
+### 6. Panduan Merilis (Deploy) ke Server VPS
+Jika Anda akan memindahkan kode Node.js ini ke *Cloud Server* (AWS, Niagahoster, dsb):
+1. Ubah variabel `http://localhost:3000` pada seluruh *fetch request* di dalam `Website/script.js` menjadi *Public IP* atau *Domain Name* mesin VPS Anda (Contoh: `https://api.domain.com`).
+2. Instal Node.js dan PM2 (`npm install -g pm2`) di server Linux.
+3. Jalankan menggunakan perintah `pm2 start API/server_mirna.js --name "backend-chamber"`. PM2 menjamin *server backend* akan hidup otomatis jika OS VPS di-*restart*.
+4. *Host* folder `Website/` menggunakan Nginx/Apache sebagai *Static Web Server*. Pastikan Anda menunjuk *Directory Root* ke letak folder website.

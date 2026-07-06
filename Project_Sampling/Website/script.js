@@ -481,10 +481,10 @@ setInterval(() => {
 // API Cuaca
 async function fetchWeather() {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Batas waktu 5 detik
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Batas waktu 10 detik
     
     try {
-        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current_weather=true', { signal: controller.signal });
+        const response = await fetch('http://localhost:3000/api/weather', { signal: controller.signal });
         clearTimeout(timeoutId);
         const result = await response.json();
         if(result.current_weather) {
