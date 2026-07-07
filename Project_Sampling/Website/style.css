@@ -18,7 +18,7 @@ body {
 }
 
 .login-body {
-    background: url('bg-login.jpg') no-repeat center center fixed;
+    background: url('tech-bg-blue.jpg') no-repeat center center fixed;
     background-size: cover;
     min-height: 100vh;
     display: flex;
@@ -28,10 +28,45 @@ body {
 
 .login-container { width: 100%; max-width: 450px; padding: 20px; }
 .login-card {
-    background: #FFFFFF;
-    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
     padding: 40px;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    color: #ffffff;
+}
+
+.login-card .input-group {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.login-card .form-control, .login-card .input-group-text {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+}
+.login-card .form-control:focus {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    box-shadow: none;
+}
+.login-card .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+.login-card .btn-primary {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    color: #fff;
+}
+.login-card .btn-primary:hover {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 /* DASHBOARD GLASSMORPHISM */

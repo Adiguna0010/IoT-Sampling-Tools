@@ -14,11 +14,11 @@
 <div class="login-container">
     <div class="login-card">
         <div class="text-center mb-4">
-            <div class="logo justify-content-center mb-2">
-                <i class="bi bi-cpu" style="font-size: 40px;"></i>
+            <div class="mb-3">
+                <img src="vanguard-logo.jpeg" alt="Vanguard Labs Logo" style="width: 110px; height: 110px; border-radius: 15px; object-fit: contain; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
             </div>
-            <h3 class="fw-bold section-title">IoT Sampling Tools</h3>
-            <p class="text-muted">Sistem Monitoring Terpadu</p>
+            <h3 class="fw-bold section-title text-white">IoT Sampling Tools</h3>
+            <p class="text-white-50">Sistem Monitoring Terpadu</p>
         </div>
         
         <form id="loginForm">
@@ -26,47 +26,43 @@
             
             <!-- LOGIN PANE -->
             <div id="login-pane">
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Username</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-person"></i></span>
-                        <input type="text" class="form-control" id="username" placeholder="Masukkan username">
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Password</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                        <input type="password" class="form-control" id="password" placeholder="Masukkan password">
-                    </div>
-                </div>
-                <button type="submit" id="btnLogin" class="btn btn-brin w-100 py-2 fs-5">Masuk <i class="bi bi-box-arrow-in-right"></i></button>
+                  <div class="mb-3">
+                      <div class="input-group">
+                          <span class="input-group-text"><i class="bi bi-person"></i></span>
+                          <input type="text" class="form-control" id="username" placeholder="Masukkan username">
+                      </div>
+                  </div>
+                  <div class="mb-4">
+                      <div class="input-group">
+                          <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                          <input type="password" class="form-control" id="password" placeholder="Masukkan password">
+                      </div>
+                  </div>
+                <button type="submit" id="btnLogin" class="btn btn-primary w-100 py-2 fs-5">Masuk <i class="bi bi-box-arrow-in-right"></i></button>
                 
                 <div class="text-center mt-3">
-                    <a href="#" id="showRegister" class="text-decoration-none small text-muted">Belum punya akun? <b class="text-primary">Daftar di sini</b></a>
+                    <a href="#" id="showRegister" class="text-decoration-none small text-white-50">Belum punya akun? <b class="text-primary">Daftar di sini</b></a>
                 </div>
             </div>
 
             <!-- REGISTER PANE -->
             <div id="register-pane" style="display: none;">
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Username Baru</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-person-plus"></i></span>
-                        <input type="text" class="form-control" id="reg-username" placeholder="Buat username">
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Password</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                        <input type="password" class="form-control" id="reg-password" placeholder="Buat password">
-                    </div>
-                </div>
-                <button type="button" id="btnRegister" class="btn btn-success w-100 py-2 fs-5">Mendaftar <i class="bi bi-person-check"></i></button>
+                  <div class="mb-3">
+                      <div class="input-group">
+                          <span class="input-group-text"><i class="bi bi-person-plus"></i></span>
+                          <input type="text" class="form-control" id="reg-username" placeholder="Buat username">
+                      </div>
+                  </div>
+                  <div class="mb-4">
+                      <div class="input-group">
+                          <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                          <input type="password" class="form-control" id="reg-password" placeholder="Buat password">
+                      </div>
+                  </div>
+                <button type="button" id="btnRegister" class="btn btn-primary w-100 py-2 fs-5">Mendaftar <i class="bi bi-person-check"></i></button>
                 
                 <div class="text-center mt-3">
-                    <a href="#" id="showLogin" class="text-decoration-none small text-muted">Sudah punya akun? <b class="text-primary">Masuk di sini</b></a>
+                    <a href="#" id="showLogin" class="text-decoration-none small text-white-50">Sudah punya akun? <b class="text-primary">Masuk di sini</b></a>
                 </div>
             </div>
         </form>
