@@ -493,3 +493,5 @@ app.get('/api/weather', async (req, res) => {
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server & WebSocket berjalan di http://0.0.0.0:${port} (Menerima koneksi dari semua IP)`);
 });
+
+module.exports = app;

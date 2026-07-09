@@ -3,7 +3,7 @@
 // ==========================================
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : 'https://iot-chamber-backend.onrender.com'; // Ganti dengan URL Render Anda nanti
+    : 'https://iot-chamber-backend.vercel.app'; // Ganti dengan URL Vercel Anda nanti
 
 // ==========================================
 // 1. OTORISASI (CEK LOGIN)
@@ -813,6 +813,11 @@ socket.on('newData', (payload) => {
     // Hal ini menyingkirkan interval 3 detik, sehingga request hanya terjadi saat benar-benar ada data baru.
     fetchData();
 });
+
+// Fallback Polling jika WebSocket tidak didukung di hosting serverless
+setInterval(() => {
+    fetchData();
+}, 3000);
 
 async function toggleKipas(chamberId, safeId, isChecked, toggleElement) {
     if(userRole === "user") return;
