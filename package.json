@@ -1,0 +1,8 @@
+{
+  "name": "iot-sampling-tools-root",
+  "version": "1.0.0",
+  "description": "Root package.json to start backend in subfolder for Glitch",
+  "scripts": {
+    "start": "cd Vanguard_Tools_Online/API && npm install && node server_mirna.js"
+  }
+}
