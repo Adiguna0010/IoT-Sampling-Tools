@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard Labs Team Tools</title>
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom Style CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.io -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.3/dist/socket.io.min.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <i class="bi bi-rocket-takeoff-fill brand-icon-glow"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>Vanguard</h2>
+                    <span>Labs Team Tools</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="nav-link active" onclick="switchTab('dashboard')">
+                    <i class="bi bi-grid-1x2-fill"></i>
+                    <span>Dashboard & IoT</span>
+                </button>
+                <button class="nav-link" onclick="switchTab('kanban')">
+                    <i class="bi bi-kanban-fill"></i>
+                    <span>Kanban Board</span>
+                </button>
+                <button class="nav-link" onclick="switchTab('wiki')">
+                    <i class="bi bi-journal-richtext"></i>
+                    <span>Team Notes</span>
+                </button>
+                <button class="nav-link" onclick="switchTab('chat')">
+                    <i class="bi bi-chat-left-text-fill"></i>
+                    <span>Live Team Chat</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">VL</div>
+                    <div class="user-info">
+                        <h4 id="current-user-display">Operator</h4>
+                        <span id="current-user-role">Vanguard Member</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+            <!-- TOP BAR -->
+            <header class="topbar">
+                <div class="page-title">
+                    <h1 id="tab-title">Dashboard & IoT Status</h1>
+                    <span id="tab-subtitle">Monitoring and control hub for Vanguard Labs.</span>
+                </div>
+                <div class="system-time">
+                    <i class="bi bi-clock-fill me-2 text-info"></i>
+                    <span id="live-clock">00:00:00</span>
+                </div>
+            </header>
+
+            <!-- TAB 1: DASHBOARD & IoT -->
+            <section id="tab-content-dashboard" class="tab-pane active-pane">
+                <div class="row g-4 mb-4">
+                    <!-- Stat Card 1 -->
+                    <div class="col-md-3">
+                        <div class="glass-card stat-card">
+                            <div class="stat-icon bg-primary-glow">
+                                <i class="bi bi-cpu"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Chamber Status</h3>
+                                <p id="txt-chamber-status" class="text-danger">Offline</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Stat Card 2 -->
+                    <div class="col-md-3">
+                        <div class="glass-card stat-card">
+                            <div class="stat-icon bg-success-glow">
+                                <i class="bi bi-thermometer-half"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Suhu Chamber</h3>
+                                <p id="txt-chamber-temp">- °C</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Stat Card 3 -->
+                    <div class="col-md-3">
+                        <div class="glass-card stat-card">
+                            <div class="stat-icon bg-info-glow">
+                                <i class="bi bi-activity"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Metana (Gas)</h3>
+                                <p id="txt-chamber-gas">- PPM</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Stat Card 4 -->
+                    <div class="col-md-3">
+                        <div class="glass-card stat-card">
+                            <div class="stat-icon bg-warning-glow">
+                                <i class="bi bi-wind"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Syringe & Fan</h3>
+                                <p id="txt-actuators">S: - | F: -</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Live Monitor Chart -->
+                    <div class="col-lg-8">
+                        <div class="glass-card h-100">
+                            <div class="card-header-vanguard">
+                                <h2>Real-time IoT Telemetry</h2>
+                                <span class="badge bg-danger pulse-badge">Live WebSocket Connection</span>
+                            </div>
+                            <div class="card-body-vanguard pt-3">
+                                <canvas id="iotLiveChart" height="260"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IoT Command Panel -->
+                    <div class="col-lg-4">
+                        <div class="glass-card h-100">
+                            <div class="card-header-vanguard">
+                                <h2>Actuators Control</h2>
+                            </div>
+                            <div class="card-body-vanguard pt-3">
+                                <div class="control-group mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                            <h4 class="mb-0 text-white">Chamber Exhaust Fan</h4>
+                                            <small class="text-muted">Turn exhaust fan on/off in real-time</small>
+                                        </div>
+                                        <div class="form-check form-switch custom-switch">
+                                            <input class="form-check-input" type="checkbox" id="switch-kipas" onchange="sendActuatorCommand('Kipas', this.checked ? '1' : '0')">
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr class="border-secondary my-3">
+                                <div class="control-group mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                            <h4 class="mb-0 text-white">Stepper Motor (Syringe)</h4>
+                                            <small class="text-muted">Trigger syringe sampling kit</small>
+                                        </div>
+                                        <button class="btn btn-primary btn-glow px-4" id="btn-syringe" onclick="sendActuatorCommand('Motor', '1')">
+                                            <i class="bi bi-play-circle-fill me-2"></i>Trigger
+                                        </button>
+                                    </div>
+                                </div>
+                                <hr class="border-secondary my-3">
+                                <div class="weather-box mt-3 text-center p-3 rounded-4 glass-weather">
+                                    <h4 class="text-white mb-2">Weather Forecast (Yogyakarta)</h4>
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <i class="bi bi-cloud-sun text-warning display-4 me-3"></i>
+                                        <div>
+                                            <h2 class="mb-0 text-white" id="weather-temp">- °C</h2>
+                                            <span class="text-muted" id="weather-desc">Mencari data...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: KANBAN BOARD -->
+            <section id="tab-content-kanban" class="tab-pane">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="text-white">Workspace Task Tracking</h2>
+                    <button class="btn btn-success btn-glow px-4" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                        <i class="bi bi-plus-circle-fill me-2"></i>Tambah Tugas
+                    </button>
+                </div>
+                
+                <div class="kanban-board">
+                    <!-- Column Todo -->
+                    <div class="kanban-column" id="col-todo" ondragover="allowDrop(event)" ondrop="dropTask(event, 'todo')">
+                        <div class="column-header text-info">
+                            <span>To Do</span>
+                            <span class="badge rounded-pill bg-info-subtle text-info border border-info px-2" id="cnt-todo">0</span>
+                        </div>
+                        <div class="column-cards" id="cards-todo"></div>
+                    </div>
+                    <!-- Column In Progress -->
+                    <div class="kanban-column" id="col-progress" ondragover="allowDrop(event)" ondrop="dropTask(event, 'progress')">
+                        <div class="column-header text-warning">
+                            <span>In Progress</span>
+                            <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning px-2" id="cnt-progress">0</span>
+                        </div>
+                        <div class="column-cards" id="cards-progress"></div>
+                    </div>
+                    <!-- Column In Review -->
+                    <div class="kanban-column" id="col-review" ondragover="allowDrop(event)" ondrop="dropTask(event, 'review')">
+                        <div class="column-header text-primary">
+                            <span>In Review</span>
+                            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary px-2" id="cnt-review">0</span>
+                        </div>
+                        <div class="column-cards" id="cards-review"></div>
+                    </div>
+                    <!-- Column Done -->
+                    <div class="kanban-column" id="col-done" ondragover="allowDrop(event)" ondrop="dropTask(event, 'done')">
+                        <div class="column-header text-success">
+                            <span>Done</span>
+                            <span class="badge rounded-pill bg-success-subtle text-success border border-success px-2" id="cnt-done">0</span>
+                        </div>
+                        <div class="column-cards" id="cards-done"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: TEAM NOTES -->
+            <section id="tab-content-wiki" class="tab-pane">
+                <div class="row g-4">
+                    <!-- List Notes -->
+                    <div class="col-md-4">
+                        <div class="glass-card h-100">
+                            <div class="card-header-vanguard d-flex justify-content-between align-items-center">
+                                <h2 class="mb-0">Daftar Catatan</h2>
+                                <button class="btn btn-outline-info btn-sm rounded-circle" onclick="createNewNote()">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                            <div class="card-body-vanguard pt-3">
+                                <div class="input-group mb-3 custom-input-group">
+                                    <span class="input-group-text bg-transparent border-secondary text-muted"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control bg-transparent border-secondary text-white" id="search-notes" placeholder="Cari catatan..." oninput="filterNotes()">
+                                </div>
+                                <div class="list-group list-group-vanguard" id="notes-list-container">
+                                    <!-- Dynamic notes list items -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- View / Edit Note -->
+                    <div class="col-md-8">
+                        <div class="glass-card h-100">
+                            <div class="card-body-vanguard pt-4 d-flex flex-column h-100">
+                                <input type="hidden" id="edit-note-id" value="">
+                                <div class="mb-3">
+                                    <label class="form-label text-muted">Judul Catatan</label>
+                                    <input type="text" class="form-control custom-input" id="edit-note-title" placeholder="Ketik judul catatan di sini...">
+                                </div>
+                                <div class="mb-3 flex-grow-1 d-flex flex-column">
+                                    <label class="form-label text-muted d-flex justify-content-between">
+                                        <span>Isi Catatan (Markdown didukung)</span>
+                                        <span id="note-save-status" class="text-success small"></span>
+                                    </label>
+                                    <textarea class="form-control custom-textarea flex-grow-1" id="edit-note-content" placeholder="Tulis isi catatan Anda di sini..."></textarea>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <button class="btn btn-danger btn-glow" id="btn-delete-note" onclick="deleteCurrentNote()" disabled>
+                                        <i class="bi bi-trash-fill me-2"></i>Hapus Catatan
+                                    </button>
+                                    <button class="btn btn-success btn-glow px-4" onclick="saveCurrentNote()">
+                                        <i class="bi bi-cloud-check-fill me-2"></i>Simpan Perubahan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: LIVE TEAM CHAT -->
+            <section id="tab-content-chat" class="tab-pane">
+                <div class="glass-card chat-workspace">
+                    <div class="chat-header">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-people-fill text-info display-6 me-3"></i>
+                            <div>
+                                <h2 class="mb-0 text-white">Saluran Diskusi Vanguard</h2>
+                                <span class="text-muted small">Pesan bersifat real-time untuk koordinasi tim</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="promptChangeUsername()">
+                            Ubah Nama Pengguna
+                        </button>
+                    </div>
+                    <div class="chat-messages" id="chat-messages-container">
+                        <!-- Message bubble template -->
+                    </div>
+                    <form class="chat-input-area" id="chat-form" onsubmit="sendChatMessage(event)">
+                        <input type="text" class="form-control chat-input" id="chat-msg-input" placeholder="Tulis pesan Anda untuk tim Vanguard..." autocomplete="off">
+                        <button class="btn btn-primary btn-glow rounded-circle" type="submit">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL TAMBAH TUGAS -->
+    <div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-modal">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white" id="addTaskModalLabel">Tambah Tugas Baru</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="addTaskForm" onsubmit="submitNewTask(event)">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Judul Tugas</label>
+                            <input type="text" class="form-control custom-input" id="task-title" required placeholder="Judul tugas...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Deskripsi</label>
+                            <textarea class="form-control custom-input" id="task-desc" rows="3" placeholder="Deskripsi tugas..."></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted">Prioritas</label>
+                                <select class="form-select custom-input" id="task-priority">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted">Due Date</label>
+                                <input type="date" class="form-control custom-input" id="task-due">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Penerima Tugas (Assignee)</label>
+                            <input type="text" class="form-control custom-input" id="task-assignee" placeholder="Nama tim...">
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success btn-glow">Simpan Tugas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom Script JS -->
+    <script src="app.js"></script>
+</body>
+</html>
