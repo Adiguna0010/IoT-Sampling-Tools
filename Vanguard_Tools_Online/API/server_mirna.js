@@ -425,9 +425,14 @@ app.get('/api/data/latest/:device', (req, res) => {
 // API GET DEVICES (Untuk mengecek ketersediaan & status)
 // ==========================================
 app.get('/api/devices', (req, res) => {
-    db.query('SELECT * FROM daftar_device', (err, results) => {
-        if (err) return res.status(500).json({ status: "gagal" });
-        res.json({ status: "berhasil", data: results });
+    // Jalankan pembaruan offline terlebih dahulu sebelum mengembalikan data (karena setInterval tidak jalan di serverless Vercel)
+    db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE", (err) => {
+        if (err) console.error("Gagal update status offline:", err.message);
+        
+        db.query('SELECT * FROM daftar_device', (err2, results) => {
+            if (err2) return res.status(500).json({ status: "gagal" });
+            res.json({ status: "berhasil", data: results });
+        });
     });
 });
 
