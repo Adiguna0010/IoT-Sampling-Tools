@@ -28,135 +28,151 @@ app.use((req, res, next) => {
 // ==========================================
 // 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA / CLOUD ONLINE)
 // ==========================================
-const db = mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',      
-    password: process.env.DB_PASSWORD || '',      
-    database: process.env.DB_NAME || 'iot_padi',
-    ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : undefined
-});
+const isProduction = !!process.env.DB_HOST;
+const db = isProduction 
+    ? mysql.createPool({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT || 3306,
+        user: process.env.DB_USER || 'root',      
+        password: process.env.DB_PASSWORD || '',      
+        database: process.env.DB_NAME || 'iot_padi',
+        ssl: { rejectUnauthorized: false },
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      })
+    : mysql.createConnection({
+        host: 'localhost',
+        port: 3306,
+        user: 'root',      
+        password: '',      
+        database: 'iot_padi' 
+      });
 
-db.connect((err) => {
-    if (err) {
-        console.error('Gagal terkoneksi ke MySQL ❌', err.message);
-    } else {
-        console.log('Berhasil terhubung ke database MySQL! ✅');
-        
-        // Membuat tabel daftar_device otomatis jika belum ada
-        const createTableQuery = `
-            CREATE TABLE IF NOT EXISTS daftar_device (
-                chamber_id VARCHAR(50) PRIMARY KEY,
-                status VARCHAR(20) DEFAULT 'Offline',
-                last_seen DATETIME
-            )
-        `;
-        db.query(createTableQuery, (err) => {
-            if (err) console.error("Gagal membuat tabel daftar_device:", err.message);
-        });
+if (isProduction) {
+    console.log('Menggunakan Pool Koneksi Database MySQL Aiven! ✅');
+} else {
+    db.connect((err) => {
+        if (err) {
+            console.error('Gagal terkoneksi ke MySQL ❌', err.message);
+        } else {
+            console.log('Berhasil terhubung ke database MySQL! ✅');
+            
+            // Membuat tabel daftar_device otomatis jika belum ada
+            const createTableQuery = `
+                CREATE TABLE IF NOT EXISTS daftar_device (
+                    chamber_id VARCHAR(50) PRIMARY KEY,
+                    status VARCHAR(20) DEFAULT 'Offline',
+                    last_seen DATETIME
+                )
+            `;
+            db.query(createTableQuery, (err) => {
+                if (err) console.error("Gagal membuat tabel daftar_device:", err.message);
+            });
 
-        // Patch: Re-create tabel commands agar strukturnya benar (VARCHAR 50)
-        db.query("DROP TABLE IF EXISTS commands", () => {
-            const createCmdQuery = `
-                CREATE TABLE commands (
+            // Patch: Re-create tabel commands agar strukturnya benar (VARCHAR 50)
+            db.query("DROP TABLE IF EXISTS commands", () => {
+                const createCmdQuery = `
+                    CREATE TABLE commands (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        chamber_id VARCHAR(50),
+                        command_name VARCHAR(50),
+                        command_value VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `;
+                db.query(createCmdQuery, (err) => {
+                    if (err) console.error("Gagal membuat ulang tabel commands:", err.message);
+                });
+            });
+
+            // Membuat tabel schedules untuk fitur otomatis/terjadwal
+            const createScheduleQuery = `
+                CREATE TABLE IF NOT EXISTS schedules (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     chamber_id VARCHAR(50),
                     command_name VARCHAR(50),
                     command_value VARCHAR(50),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    scheduled_time VARCHAR(5),
+                    last_executed DATE
                 )
             `;
-            db.query(createCmdQuery, (err) => {
-                if (err) console.error("Gagal membuat ulang tabel commands:", err.message);
+            db.query(createScheduleQuery, (err) => {
+                if (err) console.error("Gagal membuat tabel schedules:", err.message);
             });
-        });
 
-        // Membuat tabel schedules untuk fitur otomatis/terjadwal
-        const createScheduleQuery = `
-            CREATE TABLE IF NOT EXISTS schedules (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                chamber_id VARCHAR(50),
-                command_name VARCHAR(50),
-                command_value VARCHAR(50),
-                scheduled_time VARCHAR(5),
-                last_executed DATE
-            )
-        `;
-        db.query(createScheduleQuery, (err) => {
-            if (err) console.error("Gagal membuat tabel schedules:", err.message);
-        });
-
-        // Membuat tabel users untuk sistem Login Profesional
-        const createUsersQuery = `
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(50) UNIQUE,
-                password VARCHAR(255),
-                role VARCHAR(20)
-            )
-        `;
-        db.query(createUsersQuery, (err) => {
-            if (!err) {
-                // Memasukkan akun default jika tabel masih kosong
-                db.query("SELECT COUNT(*) AS cnt FROM users", (err, rows) => {
-                    if (rows[0].cnt === 0) {
-                        db.query("INSERT INTO users (username, password, role) VALUES ('operator', 'admin123', 'operator'), ('tamu', 'user123', 'user')");
-                    }
-                });
-            }
-        });
-
-        // Patch: Update tabel users untuk mendukung Master Admin & Persetujuan Login
-        db.query("ALTER TABLE users MODIFY role VARCHAR(50)", () => {
-            db.query("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT FALSE", () => {
-                // Auto-approve user lama & Insert master admin default
-                db.query("UPDATE users SET is_approved = TRUE");
-                db.query("INSERT IGNORE INTO users (username, password, role, is_approved) VALUES ('master', 'master123', 'master_admin', TRUE)");
-            });
-        });
-
-        // Menambahkan kolom syringe_present ke sensor_data secara otomatis (Jika belum ada)
-        db.query("SHOW COLUMNS FROM sensor_data LIKE 'syringe_present'", (err, results) => {
-            if (err) {
-                console.error("Gagal mengecek kolom syringe_present:", err.message);
-            } else if (results.length === 0) {
-                // Kolom belum ada, mari kita tambahkan
-                db.query("ALTER TABLE sensor_data ADD COLUMN syringe_present INT DEFAULT 0", (err2) => {
-                    if (err2) console.error("Gagal menambah kolom syringe_present:", err2.message);
-                    else console.log("Kolom 'syringe_present' berhasil ditambahkan otomatis ke tabel sensor_data! ✅");
-                });
-            }
-        });
-        
-        // Interval mengecek Offline (jika lebih dari 1 menit tidak kirim data)
-        setInterval(() => {
-            db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE");
-        }, 60000);
-
-        // Interval mengecek Jadwal Otomatis (Setiap 30 detik)
-        setInterval(() => {
-            const now = new Date();
-            const currentHHMM = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-            const currentDateStr = now.toISOString().split('T')[0]; // Format YYYY-MM-DD
-
-            const checkQuery = `SELECT * FROM schedules WHERE scheduled_time = ? AND (last_executed != ? OR last_executed IS NULL)`;
-            db.query(checkQuery, [currentHHMM, currentDateStr], (err, results) => {
-                if (err) return;
-                results.forEach(schedule => {
-                    // Eksekusi perintah (Masukkan ke tabel commands)
-                    const insertCmd = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES (?, ?, ?)';
-                    db.query(insertCmd, [schedule.chamber_id, schedule.command_name, schedule.command_value], (err2) => {
-                        if (!err2) {
-                            // Update last_executed agar tidak dieksekusi berulang kali pada menit yang sama
-                            db.query("UPDATE schedules SET last_executed = ? WHERE id = ?", [currentDateStr, schedule.id]);
-                            console.log(`[⏰ OTOMATIS] Menjalankan ${schedule.command_name} ${schedule.command_value} untuk ${schedule.chamber_id} pada ${currentHHMM}`);
+            // Membuat tabel users untuk sistem Login Profesional
+            const createUsersQuery = `
+                CREATE TABLE IF NOT EXISTS users (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE,
+                    password VARCHAR(255),
+                    role VARCHAR(20)
+                )
+            `;
+            db.query(createUsersQuery, (err) => {
+                if (!err) {
+                    // Memasukkan akun default jika tabel masih kosong
+                    db.query("SELECT COUNT(*) AS cnt FROM users", (err, rows) => {
+                        if (rows[0].cnt === 0) {
+                            db.query("INSERT INTO users (username, password, role) VALUES ('operator', 'admin123', 'operator'), ('tamu', 'user123', 'user')");
                         }
                     });
+                }
+            });
+
+            // Patch: Update tabel users untuk mendukung Master Admin & Persetujuan Login
+            db.query("ALTER TABLE users MODIFY role VARCHAR(50)", () => {
+                db.query("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT FALSE", () => {
+                    // Auto-approve user lama & Insert master admin default
+                    db.query("UPDATE users SET is_approved = TRUE");
+                    db.query("INSERT IGNORE INTO users (username, password, role, is_approved) VALUES ('master', 'master123', 'master_admin', TRUE)");
                 });
             });
-        }, 30000);
-    }
-});
+
+            // Menambahkan kolom syringe_present ke sensor_data secara otomatis (Jika belum ada)
+            db.query("SHOW COLUMNS FROM sensor_data LIKE 'syringe_present'", (err, results) => {
+                if (err) {
+                    console.error("Gagal mengecek kolom syringe_present:", err.message);
+                } else if (results.length === 0) {
+                    // Kolom belum ada, mari kita tambahkan
+                    db.query("ALTER TABLE sensor_data ADD COLUMN syringe_present INT DEFAULT 0", (err2) => {
+                        if (err2) console.error("Gagal menambah kolom syringe_present:", err2.message);
+                        else console.log("Kolom 'syringe_present' berhasil ditambahkan otomatis ke tabel sensor_data! ✅");
+                    });
+                }
+            });
+            
+            // Interval mengecek Offline (jika lebih dari 1 menit tidak kirim data)
+            setInterval(() => {
+                db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE");
+            }, 60000);
+
+            // Interval mengecek Jadwal Otomatis (Setiap 30 detik)
+            setInterval(() => {
+                const now = new Date();
+                const currentHHMM = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+                const currentDateStr = now.toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+                const checkQuery = `SELECT * FROM schedules WHERE scheduled_time = ? AND (last_executed != ? OR last_executed IS NULL)`;
+                db.query(checkQuery, [currentHHMM, currentDateStr], (err, results) => {
+                    if (err) return;
+                    results.forEach(schedule => {
+                        // Eksekusi perintah (Masukkan ke tabel commands)
+                        const insertCmd = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES (?, ?, ?)';
+                        db.query(insertCmd, [schedule.chamber_id, schedule.command_name, schedule.command_value], (err2) => {
+                            if (!err2) {
+                                // Update last_executed agar tidak dieksekusi berulang kali pada menit yang sama
+                                db.query("UPDATE schedules SET last_executed = ? WHERE id = ?", [currentDateStr, schedule.id]);
+                                console.log(`[⏰ OTOMATIS] Menjalankan ${schedule.command_name} ${schedule.command_value} untuk ${schedule.chamber_id} pada ${currentHHMM}`);
+                            }
+                        });
+                    });
+                });
+            }, 30000);
+        }
+    });
+}
 
 // ==========================================
 // 2. POST /api/login (Autentikasi Profesional)
@@ -471,6 +487,32 @@ app.delete('/api/schedules/:id', (req, res) => {
     db.query('DELETE FROM schedules WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
         res.json({ status: "berhasil", pesan: "Jadwal berhasil dihapus" });
+    });
+});
+
+app.get('/api/test-db', (req, res) => {
+    const testDb = mysql.createConnection({
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 3306,
+        user: process.env.DB_USER || 'root',      
+        password: process.env.DB_PASSWORD || '',      
+        database: process.env.DB_NAME || 'iot_padi',
+        ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : undefined
+    });
+
+    testDb.connect((err) => {
+        if (err) {
+            res.status(500).json({ status: "gagal", error: err.message, code: err.code });
+        } else {
+            testDb.query("SHOW TABLES", (err2, tables) => {
+                if (err2) {
+                    res.status(500).json({ status: "gagal_query", error: err2.message });
+                } else {
+                    res.json({ status: "berhasil", tables: tables });
+                }
+                testDb.end();
+            });
+        }
     });
 });
 
