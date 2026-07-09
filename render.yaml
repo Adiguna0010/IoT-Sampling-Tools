@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: vanguard-backend
+    name: iot-chamber-backend
     runtime: node
-    rootDir: Vanguard_Labs_Team_Tools/backend
+    rootDir: IoT Sampling Tools/Project_Sampling/API
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: node server_mirna.js
     envVars:
       - key: PORT
         value: 3000
