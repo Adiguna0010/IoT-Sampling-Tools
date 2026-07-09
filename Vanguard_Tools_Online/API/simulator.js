@@ -1,7 +1,9 @@
 // simulator.js
 // Script untuk mensimulasikan ESP32 mengirim data sensor ke server Node.js
 
-const API_URL = 'http://localhost:3000/api/data';
+const API_URL = process.argv[2] === 'online'
+    ? 'https://iot-chamber-backend.vercel.app/api/data'
+    : 'http://localhost:3000/api/data';
 const DEVICES = ['Chamber 1', 'Chamber 2']; // Mendukung simulasi beberapa Chamber sekaligus!
 
 console.log('=== SIMULATOR ESP32 SMART CHAMBER ===');
