@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: vanguard-backend
+    runtime: node
+    rootDir: Vanguard_Labs_Team_Tools/backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DB_HOST
+        sync: false
+        placeholder: "Masukkan Host DB Aiven Anda"
+      - key: DB_PORT
+        sync: false
+        placeholder: "Masukkan Port DB Aiven (misal: 12345)"
+      - key: DB_USER
+        sync: false
+        value: "avnadmin"
+      - key: DB_PASSWORD
+        sync: false
+        placeholder: "Masukkan Password DB Aiven"
+      - key: DB_NAME
+        sync: false
+        value: "defaultdb"
