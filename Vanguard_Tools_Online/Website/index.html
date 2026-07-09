@@ -84,6 +84,10 @@
 </div>
 
 <script>
+    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3000'
+        : 'https://iot-chamber-backend.vercel.app'; // Ganti dengan URL Vercel Anda nanti
+
     // Cek apakah sudah login, jika ya, langsung arahkan ke dashboard
     if(sessionStorage.getItem("role")) {
         window.location.href = "dashboard.html";
@@ -91,11 +95,6 @@
 
     document.getElementById("loginForm").addEventListener("submit", async function(e) {
         e.preventDefault();
-        
-        
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:3000'
-            : 'https://iot-chamber-backend.vercel.app'; // Ganti dengan URL Vercel Anda nanti
         const user = document.getElementById("username").value.trim();
         const pass = document.getElementById("password").value.trim();
         if(!user || !pass) return;
