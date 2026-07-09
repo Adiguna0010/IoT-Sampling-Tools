@@ -490,31 +490,7 @@ app.delete('/api/schedules/:id', (req, res) => {
     });
 });
 
-app.get('/api/test-db', (req, res) => {
-    const testDb = mysql.createConnection({
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 3306,
-        user: process.env.DB_USER || 'root',      
-        password: process.env.DB_PASSWORD || '',      
-        database: process.env.DB_NAME || 'iot_padi',
-        ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : undefined
-    });
 
-    testDb.connect((err) => {
-        if (err) {
-            res.status(500).json({ status: "gagal", error: err.message, code: err.code });
-        } else {
-            testDb.query("SHOW TABLES", (err2, tables) => {
-                if (err2) {
-                    res.status(500).json({ status: "gagal_query", error: err2.message });
-                } else {
-                    res.json({ status: "berhasil", tables: tables });
-                }
-                testDb.end();
-            });
-        }
-    });
-});
 
 // ==========================================
 // 8. API CUACA (Proxy)
