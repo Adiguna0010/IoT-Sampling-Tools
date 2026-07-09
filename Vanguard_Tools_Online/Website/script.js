@@ -1,4 +1,11 @@
 // ==========================================
+// 0. KONFIGURASI API URL (LOCAL & ONLINE)
+// ==========================================
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000'
+    : 'https://iot-chamber-backend.onrender.com'; // Ganti dengan URL Render Anda nanti
+
+// ==========================================
 // 1. OTORISASI (CEK LOGIN)
 // ==========================================
 const userRole = sessionStorage.getItem("role");
@@ -33,7 +40,7 @@ window.onload = function() {
     }
 
     // Ambil Total Pengguna dari Database
-    fetch('http://localhost:3000/api/system/health')
+    fetch(`${API_URL}/api/system/health`)
         .then(res => res.json())
         .then(data => {
             document.getElementById("active-users-count").innerText = data.total_users;
@@ -222,7 +229,7 @@ async function prosesTambahChamber() {
     if(!chamberId) return alert("Silakan masukkan ID Chamber!");
     
     try {
-        const res = await fetch('http://localhost:3000/api/devices');
+        const res = await fetch(`${API_URL}/api/devices`);
         const json = await res.json();
         
         if (json.status === "berhasil") {
@@ -313,7 +320,7 @@ async function bukaDetail(chamberId) {
     
     try {
         // Ambil Data Terkini untuk Panel Kiri
-        const resLatest = await fetch(`http://localhost:3000/api/data/latest/${chamberId}`);
+        const resLatest = await fetch(`${API_URL}/api/data/latest/${chamberId}`);
         const jsonLatest = await resLatest.json();
         if (jsonLatest.status === "berhasil" && jsonLatest.data) {
             document.getElementById("detail-suhu").innerText = `${jsonLatest.data.suhu} °C`;
@@ -323,7 +330,7 @@ async function bukaDetail(chamberId) {
         }
 
         // Ambil Data History untuk Chart dan Tabel
-        const resHistory = await fetch(`http://localhost:3000/api/data/history/${chamberId}`);
+        const resHistory = await fetch(`${API_URL}/api/data/history/${chamberId}`);
         const jsonHistory = await resHistory.json();
         
         if(jsonHistory.status === "berhasil" && jsonHistory.data.length > 0) {
@@ -441,7 +448,7 @@ function updateParentScheduleView() {
 async function loadJadwal() {
     if (!currentDetailChamber || userRole === "user") return;
     try {
-        const res = await fetch(`http://localhost:3000/api/schedules/${currentDetailChamber}`);
+        const res = await fetch(`${API_URL}/api/schedules/${currentDetailChamber}`);
         const json = await res.json();
         const tbody = document.getElementById("list-jadwal");
         
@@ -487,7 +494,7 @@ async function tambahJadwal(event) {
     const timeVal = document.getElementById("jadwal-waktu").value;
     
     try {
-        const res = await fetch('http://localhost:3000/api/schedules', {
+        const res = await fetch(`${API_URL}/api/schedules`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -514,7 +521,7 @@ async function hapusJadwal(id) {
     if(!confirm("Hapus jadwal ini?")) return;
     try {
         const scheduleItem = activeSchedules.find(item => item.id == id);
-        await fetch(`http://localhost:3000/api/schedules/${id}`, { method: 'DELETE' });
+        await fetch(`${API_URL}/api/schedules/${id}`, { method: 'DELETE' });
         
         if (scheduleItem) {
             let valDisplay = scheduleItem.command_value;
@@ -534,7 +541,7 @@ async function hapusJadwal(id) {
 // Memperbarui Overview Table di panel bawah
 async function updateOverviewTable() {
     try {
-        const res = await fetch('http://localhost:3000/api/devices');
+        const res = await fetch(`${API_URL}/api/devices`);
         const json = await res.json();
         
         if (json.status === "berhasil") {
@@ -586,7 +593,7 @@ async function fetchWeather() {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // Batas waktu 10 detik
     
     try {
-        const response = await fetch('http://localhost:3000/api/weather', { signal: controller.signal });
+        const response = await fetch(`${API_URL}/api/weather`, { signal: controller.signal });
         clearTimeout(timeoutId);
         const result = await response.json();
         if(result.current_weather) {
@@ -660,7 +667,7 @@ async function fetchData() {
     const fetchPromises = activeChambers.map(async (chamberId) => {
         const safeId = chamberId.replace(/\s+/g, '-');
         try {
-            const response = await fetch(`http://localhost:3000/api/data/latest/${chamberId}`);
+            const response = await fetch(`${API_URL}/api/data/latest/${chamberId}`);
             const result = await response.json();
             return { chamberId, safeId, result };
         } catch (error) {
@@ -799,7 +806,7 @@ async function fetchData() {
 }
 
 // Inisialisasi WebSocket
-const socket = io('http://localhost:3000');
+const socket = io(API_URL);
 socket.on('newData', (payload) => {
     // Saat mendapat sinyal data baru dari server, kita cukup memanggil fetchData
     // karena fetchData sudah menangani update UI dan update Global Chart dengan rata-rata.
@@ -811,7 +818,7 @@ async function toggleKipas(chamberId, safeId, isChecked, toggleElement) {
     if(userRole === "user") return;
     try {
         const payload = [{ chamber_id: chamberId, command_name: "Kipas", command_value: isChecked ? "1" : "0" }];
-        const res = await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const res = await fetch(`${API_URL}/api/commands`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error("Server error");
         
         // Sinkronkan toggle lain jika berhasil
@@ -842,7 +849,7 @@ async function moveSyringe(chamberId, direction) {
     }
     try {
         const payload = [{ chamber_id: chamberId, command_name: "Syringe", command_value: direction }];
-        const res = await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const res = await fetch(`${API_URL}/api/commands`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error("Server error");
         
         // Tambahkan notifikasi aktivitas
@@ -864,7 +871,7 @@ async function loadUsers() {
     const tbody = document.getElementById('user-table-body');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
     try {
-        const res = await fetch('http://localhost:3000/api/users');
+        const res = await fetch(`${API_URL}/api/users`);
         const users = await res.json();
         tbody.innerHTML = '';
         users.forEach(u => {
@@ -895,20 +902,20 @@ async function loadUsers() {
 
 async function approveUser(id) {
     if(!confirm('Setujui pendaftaran user ini?')) return;
-    await fetch(`http://localhost:3000/api/users/${id}/approve`, { method: 'PUT' });
+    await fetch(`${API_URL}/api/users/${id}/approve`, { method: 'PUT' });
     loadUsers();
 }
 
 async function deleteUser(id) {
     if(!confirm('Yakin ingin menghapus user ini?')) return;
-    await fetch(`http://localhost:3000/api/users/${id}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/api/users/${id}`, { method: 'DELETE' });
     loadUsers();
 }
 
 async function changeRole(id, newRole) {
     if(!confirm('Ubah jabatan user ini?')) { loadUsers(); return; }
     try {
-        const res = await fetch(`http://localhost:3000/api/users/${id}/role`, {
+        const res = await fetch(`${API_URL}/api/users/${id}/role`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ role: newRole })
@@ -922,7 +929,7 @@ async function changeRole(id, newRole) {
 async function resetPassword(id) {
     if(!confirm('Yakin ingin mereset password akun ini?')) return;
     try {
-        const res = await fetch(`http://localhost:3000/api/users/${id}/reset-password`, { method: 'PUT' });
+        const res = await fetch(`${API_URL}/api/users/${id}/reset-password`, { method: 'PUT' });
         const json = await res.json();
         alert(json.pesan);
     } catch(e) { alert("Gagal mereset password"); }
@@ -932,7 +939,7 @@ async function cleanDatabase() {
     const days = document.getElementById("clean-days").value;
     if(!confirm(`BAHAYA: Yakin ingin menghapus semua data sensor yang umurnya lebih dari ${days} hari?`)) return;
     try {
-        const res = await fetch(`http://localhost:3000/api/database/clean?days=${days}`, { method: 'DELETE' });
+        const res = await fetch(`${API_URL}/api/database/clean?days=${days}`, { method: 'DELETE' });
         const json = await res.json();
         alert(json.pesan);
     } catch(e) { alert("Gagal membersihkan database"); }
@@ -950,7 +957,7 @@ async function exportDataCSV() {
         const start = document.getElementById("export-start").value;
         const end = document.getElementById("export-end").value;
         
-        let url = `http://localhost:3000/api/export?chamber=${chamber}`;
+        let url = `${API_URL}/api/export?chamber=${chamber}`;
         if(start) url += `&start=${start}`;
         if(end) url += `&end=${end}`;
 
@@ -1019,7 +1026,7 @@ async function changeMyPassword() {
     
     try {
         const username = sessionStorage.getItem("username");
-        const res = await fetch(`http://localhost:3000/api/users/change-password`, {
+        const res = await fetch(`${API_URL}/api/users/change-password`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: username, old_password: oldPass, new_password: newPass })
@@ -1035,7 +1042,7 @@ async function changeMyPassword() {
 
 async function fetchServerHealth() {
     try {
-        const res = await fetch('http://localhost:3000/api/system/health');
+        const res = await fetch(`${API_URL}/api/system/health`);
         const data = await res.json();
         document.getElementById("sh-cpu").innerText = data.cpu;
         document.getElementById("sh-os").innerText = data.os;

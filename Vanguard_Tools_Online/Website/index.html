@@ -92,6 +92,10 @@
     document.getElementById("loginForm").addEventListener("submit", async function(e) {
         e.preventDefault();
         
+        
+        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000'
+            : 'https://iot-chamber-backend.onrender.com'; // Ganti dengan URL Render Anda nanti
         const user = document.getElementById("username").value.trim();
         const pass = document.getElementById("password").value.trim();
         if(!user || !pass) return;
@@ -103,7 +107,7 @@
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Loading...`;
         
         try {
-            const res = await fetch('http://localhost:3000/api/login', {
+            const res = await fetch(`${API_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: user, password: pass })
@@ -149,7 +153,7 @@
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Loading...`;
 
         try {
-            const res = await fetch('http://localhost:3000/api/register', {
+            const res = await fetch(`${API_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: user, password: pass })

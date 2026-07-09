@@ -2,7 +2,7 @@ services:
   - type: web
     name: iot-chamber-backend
     runtime: node
-    rootDir: IoT Sampling Tools/Project_Sampling/API
+    rootDir: Vanguard_Tools_Online/API
     buildCommand: npm install
     startCommand: node server_mirna.js
     envVars:
