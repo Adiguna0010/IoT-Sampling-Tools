@@ -3,7 +3,7 @@
 // ==========================================
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : 'https://adiguna0010-iot-chamber-backend.hf.space'; // URL Hugging Face Space Anda
+    : 'https://adiguna16-iot-chamber-backend.hf.space'; // URL Hugging Face Space Anda
 
 // ==========================================
 // 1. OTORISASI (CEK LOGIN)
