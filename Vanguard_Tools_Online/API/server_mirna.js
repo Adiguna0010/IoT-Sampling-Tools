@@ -240,6 +240,77 @@ if (isProduction) {
 }
 
 // ==========================================
+// API CRON (Pengecekan Jadwal Otomatis dari Pihak Ketiga)
+// ==========================================
+app.get('/api/cron', (req, res) => {
+    console.log("[⏰ CRON] Menerima trigger pengecekan jadwal...");
+    
+    try {
+        const options = { timeZone: 'Asia/Jakarta', hour12: false, hour: '2-digit', minute: '2-digit' };
+        const dateOptions = { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' };
+        
+        const timeFormatter = new Intl.DateTimeFormat('en-US', options);
+        const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
+        
+        const currentHHMM = timeFormatter.format(new Date()).replace(/24:/, '00:');
+        
+        const dateParts = dateFormatter.formatToParts(new Date());
+        const year = dateParts.find(p => p.type === 'year').value;
+        const month = dateParts.find(p => p.type === 'month').value;
+        const day = dateParts.find(p => p.type === 'day').value;
+        const currentDateStr = `${year}-${month}-${day}`;
+
+        console.log(`[⏰ CRON] Waktu Jakarta: ${currentHHMM} | Tanggal: ${currentDateStr}`);
+
+        // Update status device offline juga secara periodik lewat cron
+        db.query("UPDATE daftar_device SET status='Offline' WHERE last_seen < NOW() - INTERVAL 1 MINUTE", (errOffline) => {
+            if (errOffline) console.error("[❌] Cron gagal update status offline:", errOffline.message);
+        });
+
+        const checkQuery = `SELECT * FROM schedules WHERE scheduled_time = ? AND (last_executed != ? OR last_executed IS NULL)`;
+        db.query(checkQuery, [currentHHMM, currentDateStr], (err, results) => {
+            if (err) {
+                console.error("[❌] Gagal mengambil data jadwal:", err.message);
+                return res.status(500).json({ status: "gagal", pesan: err.message });
+            }
+            
+            if (results.length === 0) {
+                return res.json({ status: "berhasil", pesan: `Tidak ada jadwal untuk dieksekusi pada menit ${currentHHMM}` });
+            }
+
+            const promises = results.map(schedule => {
+                return new Promise((resolve, reject) => {
+                    const insertCmd = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES (?, ?, ?)';
+                    db.query(insertCmd, [schedule.chamber_id, schedule.command_name, schedule.command_value], (err2) => {
+                        if (err2) {
+                            console.error(`[❌] Gagal menyimpan perintah untuk ${schedule.chamber_id}:`, err2.message);
+                            reject(err2);
+                        } else {
+                            db.query("UPDATE schedules SET last_executed = ? WHERE id = ?", [currentDateStr, schedule.id], (err3) => {
+                                if (err3) console.error("[❌] Gagal update last_executed:", err3.message);
+                                console.log(`[⏰ OTOMATIS] Menjalankan ${schedule.command_name} ${schedule.command_value} untuk ${schedule.chamber_id} pada ${currentHHMM}`);
+                                resolve();
+                            });
+                        }
+                    });
+                });
+            });
+
+            Promise.all(promises)
+                .then(() => {
+                    res.json({ status: "berhasil", pesan: `${results.length} jadwal berhasil dieksekusi.` });
+                })
+                .catch(error => {
+                    res.status(500).json({ status: "gagal", pesan: "Sebagian atau seluruh jadwal gagal dieksekusi." });
+                });
+        });
+    } catch (e) {
+        console.error("[❌] Error pada cron endpoint:", e.message);
+        res.status(500).json({ status: "gagal", pesan: e.message });
+    }
+});
+
+// ==========================================
 // 2. POST /api/login (Autentikasi Profesional)
 // ==========================================
 app.post('/api/login', (req, res) => {
