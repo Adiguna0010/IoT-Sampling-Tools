@@ -25,6 +25,7 @@ const int stepPin = 13;
 const int limitAtasPin = 25;    // LS1 (Atas / Narik Full)
 const int limitBawahPin = 26;   // LS2 (Bawah / Tutup)
 const int limitSyringePin = 27; // LS3 (Syringe Ready / Tersedia)
+const bool USE_LIMIT_SWITCHES = false; // Ubah ke false jika ingin mengabaikan limit switch di software (bypass)
 
 // ================= VARIABEL GLOBAL =================
 Adafruit_BME280 bmeAtas;  // BME 1 (SDO -> GND, Alamat I2C: 0x76)
@@ -107,7 +108,7 @@ void taskSensorDanWiFi(void * pvParameters) {
     int avgGasPPM = (mq1_1 + mq1_2 + mq1_3 + mq2_1 + mq2_2 + mq2_3) / 6;
     
     // Status syringe: 1 jika ready (LS3 aktif / LOW), 0 jika tidak
-    int isSyringePresent = bacaSensorStabil(limitSyringePin, LOW) ? 1 : 0;
+    int isSyringePresent = (USE_LIMIT_SWITCHES) ? (bacaSensorStabil(limitSyringePin, LOW) ? 1 : 0) : 1;
 
     // --- TAMPILKAN KE SERIAL MONITOR ---
     Serial.println("\n=== HASIL PEMBACAAN SENSOR (AVERAGED) ===");
@@ -161,7 +162,7 @@ void prosesPerintah(String cmd) {
   cmd.toUpperCase();
   
   // Periksa apakah syringe ready / LS3 aktif (LOW)
-  bool syringeReady = bacaSensorStabil(limitSyringePin, LOW);
+  bool syringeReady = (USE_LIMIT_SWITCHES) ? bacaSensorStabil(limitSyringePin, LOW) : true;
 
   if (cmd == "1") {
     digitalWrite(RELAY_KIPAS_PIN, LOW); // LOW = Aktif = Kipas ON
@@ -175,14 +176,14 @@ void prosesPerintah(String cmd) {
   } 
   else if (cmd == "U" || cmd == "D") {
     // PROTEKSI UTAMA: Tolak gerakan jika syringe belum ready / LS3 tidak aktif
-    if (!syringeReady) {
+    if (USE_LIMIT_SWITCHES && !syringeReady) {
       Serial.println("PROSES MOTOR DITOLAK: Syringe belum ready / LS3 tidak aktif!");
       motorState = 0;
       return;
     }
     
     if (cmd == "U") {
-      if (!bacaSensorStabil(limitAtasPin, LOW)) { // Batasi jika limit atas sudah tertekan
+      if (!USE_LIMIT_SWITCHES || !bacaSensorStabil(limitAtasPin, LOW)) { // Batasi jika limit atas sudah tertekan
         motorState = 1;
         digitalWrite(dirPin, HIGH);
         Serial.println("Status: Motor NAIK (Up)");
@@ -191,7 +192,7 @@ void prosesPerintah(String cmd) {
       }
     } 
     else if (cmd == "D") {
-      if (!bacaSensorStabil(limitBawahPin, LOW)) { // Batasi jika limit bawah sudah tertekan
+      if (!USE_LIMIT_SWITCHES || !bacaSensorStabil(limitBawahPin, LOW)) { // Batasi jika limit bawah sudah tertekan
         motorState = 2;
         digitalWrite(dirPin, LOW);
         Serial.println("Status: Motor TURUN (Down)");
@@ -268,7 +269,7 @@ void loop() {
   }
 
   // 2. Proteksi Keamanan Real-time Motor (Setiap Siklus Loop)
-  if (motorState != 0) {
+  if (USE_LIMIT_SWITCHES && motorState != 0) {
     // Emergency Stop 1: Jika di tengah gerakan syringe terlepas / LS3 tidak aktif
     if (bacaSensorStabil(limitSyringePin, HIGH)) {
       motorState = 0;
