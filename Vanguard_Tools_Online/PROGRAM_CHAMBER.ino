@@ -5,8 +5,8 @@
 #include <Adafruit_BME280.h>
 
 // ================= KONFIGURASI WIFI & SERVER =================
-const char* ssid = "1234";
-const char* password = "12345678";
+const char* ssid = "ChamberBase";
+const char* password = "chamber123";
 const char* serverUrl = "https://iot-chamber-backend.vercel.app/api/data"; 
 
 // ================= KONFIGURASI PIN =================
