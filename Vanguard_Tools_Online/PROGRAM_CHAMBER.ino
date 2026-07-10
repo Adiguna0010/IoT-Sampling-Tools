@@ -126,6 +126,10 @@ void taskSensorDanWiFi(void * pvParameters) {
     Serial.printf("Rata-rata Tekanan   : %.2f hPa\n", avgTekanan);
     Serial.printf("Rata-rata Gas PPM   : %d PPM\n", avgGasPPM);
     Serial.printf("Status Syringe (LS3): %s\n", isSyringePresent ? "READY" : "NOT READY");
+    Serial.println("--- RAW LIMIT SWITCH STATES (DIAGNOSTIC) ---");
+    Serial.printf("Limit Atas (Pin %d)    : %d (Active State: %s)\n", limitAtasPin, digitalRead(limitAtasPin), LIMIT_ATAS_ACTIVE_STATE == LOW ? "LOW" : "HIGH");
+    Serial.printf("Limit Bawah (Pin %d)   : %d (Active State: %s)\n", limitBawahPin, digitalRead(limitBawahPin), LIMIT_BAWAH_ACTIVE_STATE == LOW ? "LOW" : "HIGH");
+    Serial.printf("Limit Syringe (Pin %d) : %d (Active State: %s)\n", limitSyringePin, digitalRead(limitSyringePin), LIMIT_SYRINGE_ACTIVE_STATE == LOW ? "LOW" : "HIGH");
     Serial.println("=========================================\n");
 
     // --- FORMAT JSON PAYLOAD ---
