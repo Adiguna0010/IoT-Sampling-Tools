@@ -289,6 +289,33 @@ function prosesKurangiChamber() {
     }
 }
 
+function updateModalControlsState(isDeviceOnline) {
+    const manualForm = document.getElementById("manual-controls-form");
+    const manualAlert = document.getElementById("manual-offline-alert");
+    const otomatisForm = document.getElementById("otomatis-controls-form");
+    const otomatisAlert = document.getElementById("otomatis-offline-alert");
+    
+    if (manualForm && manualAlert) {
+        if (isDeviceOnline) {
+            manualForm.style.setProperty("display", "block", "important");
+            manualAlert.style.setProperty("display", "none", "important");
+        } else {
+            manualForm.style.setProperty("display", "none", "important");
+            manualAlert.style.setProperty("display", "flex", "important");
+        }
+    }
+    
+    if (otomatisForm && otomatisAlert) {
+        if (isDeviceOnline) {
+            otomatisForm.style.setProperty("display", "block", "important");
+            otomatisAlert.style.setProperty("display", "none", "important");
+        } else {
+            otomatisForm.style.setProperty("display", "none", "important");
+            otomatisAlert.style.setProperty("display", "flex", "important");
+        }
+    }
+}
+
 // Membuka Modal Detail (Sensor Terkini + Log Activity)
 async function bukaDetail(chamberId) {
     currentDetailChamber = chamberId;
@@ -325,6 +352,9 @@ async function bukaDetail(chamberId) {
             statusBadge.className = "badge bg-danger ms-2";
         }
     }
+    
+    // Toggle manual/otomatis forms or offline alert card
+    updateModalControlsState(isDeviceOnline);
 
     if (kipasSwitch) {
         kipasSwitch.onchange = () => toggleKipas(chamberId, null, kipasSwitch.checked, kipasSwitch);
@@ -630,6 +660,33 @@ async function updateOverviewTable() {
                         badgeStatusCard.innerText = statusText;
                         badgeStatusCard.className = (statusText === 'Online') ? 'badge bg-success' : 'badge bg-danger';
                     }
+                    
+                    // Update Status Koneksi di Detail Modal secara real-time
+                    if (currentDetailChamber === chamberId) {
+                        const isDeviceOnline = (statusText === 'Online');
+                        const statusBadge = document.getElementById("detail-status-badge");
+                        if (statusBadge) {
+                            if (isDeviceOnline) {
+                                statusBadge.innerText = "Online";
+                                statusBadge.className = "badge bg-success ms-2";
+                            } else {
+                                statusBadge.innerText = "Offline";
+                                statusBadge.className = "badge bg-danger ms-2";
+                            }
+                        }
+                        updateModalControlsState(isDeviceOnline);
+                        
+                        // Kunci kontrol jika offline
+                        const detailBadge = document.getElementById("detail-ctrl-badge");
+                        const dBtnUp = document.getElementById("detail-btn-up");
+                        const dBtnDown = document.getElementById("detail-btn-down");
+                        if (!isDeviceOnline && detailBadge) {
+                            detailBadge.innerText = "Device Offline";
+                            detailBadge.className = "badge bg-secondary ms-1";
+                            if (dBtnUp) dBtnUp.disabled = true;
+                            if (dBtnDown) dBtnDown.disabled = true;
+                        }
+                    }
                 } else {
                     chamberStatuses[chamberId] = 'Offline';
                     html += `<tr><td>${chamberId}</td><td><span class="badge bg-secondary">Unknown</span></td><td>-</td></tr>`;
@@ -834,6 +891,9 @@ async function fetchData() {
                                  if (!isDeviceOnline) kipasSwitch.checked = false;
                              }
                             
+                             // Toggle manual/otomatis forms or offline alert card dynamically
+                             updateModalControlsState(isDeviceOnline);
+                             
                             if (isNewData && isDeviceOnline) {
                                 lastProcessedDataId[chamberId] = data.id;
 
