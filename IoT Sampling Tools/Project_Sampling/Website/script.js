@@ -16,6 +16,8 @@ let historyChartInstance;
 let currentDetailChamber = ""; // Menyimpan chamber yang sedang dibuka detailnya
 // Coba ambil dari LocalStorage, jika kosong gunakan default ['Chamber 1']
 let activeChambers = JSON.parse(localStorage.getItem('savedChambers')) || ['Chamber 1'];
+let chamberStatuses = {};
+let lastProcessedDataId = {};
 
 window.onload = function() {
     document.getElementById("display-username").innerText = username;
@@ -327,6 +329,7 @@ async function bukaDetail(chamberId) {
         const jsonHistory = await resHistory.json();
         
         if(jsonHistory.status === "berhasil" && jsonHistory.data.length > 0) {
+            lastProcessedDataId[chamberId] = jsonHistory.data[0].id;
             let html = "";
             let labels = [];
             let suhuData = [];
@@ -548,6 +551,7 @@ async function updateOverviewTable() {
                 
                 if (deviceData) {
                     const statusText = deviceData.status; // 'Online' atau 'Offline'
+                    chamberStatuses[chamberId] = statusText;
                     const statusBadge = (statusText === 'Online') ? '<span class="badge bg-success">Online</span>' : '<span class="badge bg-danger">Offline</span>';
                     html += `<tr><td>${chamberId}</td><td>${statusBadge}</td><td>${new Date(deviceData.last_seen).toLocaleTimeString()}</td></tr>`;
                     
@@ -559,6 +563,7 @@ async function updateOverviewTable() {
                         badgeStatusCard.className = (statusText === 'Online') ? 'badge bg-success' : 'badge bg-danger';
                     }
                 } else {
+                    chamberStatuses[chamberId] = 'Offline';
                     html += `<tr><td>${chamberId}</td><td><span class="badge bg-secondary">Unknown</span></td><td>-</td></tr>`;
                     if (badgeStatusCard) badgeStatusCard.className = 'badge bg-secondary';
                 }
@@ -651,7 +656,7 @@ function updateGlobalChartVisibility() {
 
 async function fetchData() {
     // Perbarui status koneksi device juga setiap cycle
-    updateOverviewTable();
+    await updateOverviewTable();
 
     let sumSuhu = 0, sumLembap = 0, sumTekanan = 0, sumMetana = 0;
     let countValidData = 0;
@@ -675,12 +680,14 @@ async function fetchData() {
         if (result && result.status === "berhasil" && result.data) {
             const data = result.data;
             
-            // Tambahkan ke kalkulasi rata-rata global
-            sumSuhu += parseFloat(data.suhu) || 0;
-            sumLembap += parseFloat(data.kelembaban) || 0;
-            sumTekanan += parseFloat(data.tekanan) || 0;
-            sumMetana += parseFloat(data.gas_metana) || 0;
-            countValidData++;
+            // Tambahkan ke kalkulasi rata-rata global jika device Online
+            if (chamberStatuses[chamberId] === 'Online') {
+                sumSuhu += parseFloat(data.suhu) || 0;
+                sumLembap += parseFloat(data.kelembaban) || 0;
+                sumTekanan += parseFloat(data.tekanan) || 0;
+                sumMetana += parseFloat(data.gas_metana) || 0;
+                countValidData++;
+            }
             
             if(document.getElementById(`suhu-${safeId}`)) {
                 document.getElementById(`suhu-${safeId}`).innerText = `${data.suhu} °C`;
@@ -719,37 +726,45 @@ async function fetchData() {
                             document.getElementById('detail-tekanan').innerText = `${data.tekanan} hPa`;
                             document.getElementById('detail-metana').innerText = `${data.gas_metana} ppm`;
                             
-                            // Update Grafik History secara real-time
-                            if (historyChartInstance) {
-                                const time = new Date().toLocaleTimeString();
-                                historyChartInstance.data.labels.push(time);
-                                historyChartInstance.data.datasets[0].data.push(data.suhu);
-                                historyChartInstance.data.datasets[1].data.push(data.kelembaban);
-                                historyChartInstance.data.datasets[2].data.push(data.tekanan);
-                                historyChartInstance.data.datasets[3].data.push(data.gas_metana);
-                                
-                                // Geser grafik jika kepanjangan
-                                if(historyChartInstance.data.labels.length > 50) {
-                                    historyChartInstance.data.labels.shift();
-                                    historyChartInstance.data.datasets.forEach(dataset => dataset.data.shift());
-                                }
-                                historyChartInstance.update('none');
-                            }
+                            // Cek apakah ada data baru dan device Online
+                            const isNewData = !lastProcessedDataId[chamberId] || lastProcessedDataId[chamberId] !== data.id;
+                            const isDeviceOnline = chamberStatuses[chamberId] === 'Online';
                             
-                            // Update Tabel Log secara real-time
-                            const logTableBody = document.getElementById("logTableBody");
-                            if (logTableBody) {
-                                const newRow = document.createElement("tr");
-                                newRow.innerHTML = `
-                                    <td>#${data.id || '?'}</td>
-                                    <td>${data.suhu}</td>
-                                    <td>${data.kelembaban}</td>
-                                    <td>${data.tekanan}</td>
-                                    <td>${data.gas_metana}</td>
-                                `;
-                                logTableBody.insertBefore(newRow, logTableBody.firstChild);
-                                if (logTableBody.children.length > 30) {
-                                    logTableBody.removeChild(logTableBody.lastChild);
+                            if (isNewData && isDeviceOnline) {
+                                lastProcessedDataId[chamberId] = data.id;
+
+                                // Update Grafik History secara real-time
+                                if (historyChartInstance) {
+                                    const time = new Date().toLocaleTimeString();
+                                    historyChartInstance.data.labels.push(time);
+                                    historyChartInstance.data.datasets[0].data.push(data.suhu);
+                                    historyChartInstance.data.datasets[1].data.push(data.kelembaban);
+                                    historyChartInstance.data.datasets[2].data.push(data.tekanan);
+                                    historyChartInstance.data.datasets[3].data.push(data.gas_metana);
+                                    
+                                    // Geser grafik jika kepanjangan
+                                    if(historyChartInstance.data.labels.length > 50) {
+                                        historyChartInstance.data.labels.shift();
+                                        historyChartInstance.data.datasets.forEach(dataset => dataset.data.shift());
+                                    }
+                                    historyChartInstance.update('none');
+                                }
+                                
+                                // Update Tabel Log secara real-time
+                                const logTableBody = document.getElementById("logTableBody");
+                                if (logTableBody) {
+                                    const newRow = document.createElement("tr");
+                                    newRow.innerHTML = `
+                                        <td>#${data.id || '?'}</td>
+                                        <td>${data.suhu}</td>
+                                        <td>${data.kelembaban}</td>
+                                        <td>${data.tekanan}</td>
+                                        <td>${data.gas_metana}</td>
+                                    `;
+                                    logTableBody.insertBefore(newRow, logTableBody.firstChild);
+                                    if (logTableBody.children.length > 30) {
+                                        logTableBody.removeChild(logTableBody.lastChild);
+                                    }
                                 }
                             }
                         }
