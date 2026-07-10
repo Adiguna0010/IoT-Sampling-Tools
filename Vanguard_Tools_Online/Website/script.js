@@ -342,16 +342,6 @@ async function bukaDetail(chamberId) {
     
     // Cek status koneksi alat
     const isDeviceOnline = chamberStatuses[chamberId] === 'Online';
-    const statusBadge = document.getElementById("detail-status-badge");
-    if (statusBadge) {
-        if (isDeviceOnline) {
-            statusBadge.innerText = "Online";
-            statusBadge.className = "badge bg-success ms-2";
-        } else {
-            statusBadge.innerText = "Offline";
-            statusBadge.className = "badge bg-danger ms-2";
-        }
-    }
     
     // Toggle manual/otomatis forms or offline alert card
     updateModalControlsState(isDeviceOnline);
@@ -664,16 +654,6 @@ async function updateOverviewTable() {
                     // Update Status Koneksi di Detail Modal secara real-time
                     if (currentDetailChamber === chamberId) {
                         const isDeviceOnline = (statusText === 'Online');
-                        const statusBadge = document.getElementById("detail-status-badge");
-                        if (statusBadge) {
-                            if (isDeviceOnline) {
-                                statusBadge.innerText = "Online";
-                                statusBadge.className = "badge bg-success ms-2";
-                            } else {
-                                statusBadge.innerText = "Offline";
-                                statusBadge.className = "badge bg-danger ms-2";
-                            }
-                        }
                         updateModalControlsState(isDeviceOnline);
                         
                         // Kunci kontrol jika offline
@@ -871,18 +851,6 @@ async function fetchData() {
                             // Cek apakah ada data baru dan device Online
                             const isNewData = !lastProcessedDataId[chamberId] || lastProcessedDataId[chamberId] !== data.id;
                             const isDeviceOnline = chamberStatuses[chamberId] === 'Online';
-                             
-                             // Update Status Badge (Online/Offline) in detail modal header
-                             const statusBadge = document.getElementById("detail-status-badge");
-                             if (statusBadge) {
-                                 if (isDeviceOnline) {
-                                     statusBadge.innerText = "Online";
-                                     statusBadge.className = "badge bg-success ms-2";
-                                 } else {
-                                     statusBadge.innerText = "Offline";
-                                     statusBadge.className = "badge bg-danger ms-2";
-                                 }
-                             }
                              
                              // Disable/enable kipas switch dynamically based on status
                              const kipasSwitch = document.getElementById("detail-kipas-switch");

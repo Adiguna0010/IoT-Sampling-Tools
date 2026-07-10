@@ -167,7 +167,7 @@
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-cpu"></i> Detail - <span id="detailChamberTitle"></span> <span id="detail-status-badge" class="badge bg-success ms-2" style="font-size: 11px;">Online</span></h5>
+                    <h5 class="modal-title fw-bold"><i class="bi bi-cpu"></i> Detail - <span id="detailChamberTitle"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
@@ -210,7 +210,8 @@
                             <div class="tab-content" id="ctrl-tabContent">
                                 <!-- Mode Manual -->
                                 <div class="tab-pane fade show active" id="panel-manual" role="tabpanel">
-                                    <div class="p-3 bg-light rounded border">
+                                    <!-- Form Kontrol Manual -->
+                                    <div id="manual-controls-form" class="p-3 bg-light rounded border">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <span class="fw-bold text-secondary small"><i class="bi bi-fan"></i> Kipas</span>
                                             <label class="switch-mini">
@@ -226,11 +227,18 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <!-- Alert Offline Manual -->
+                                    <div id="manual-offline-alert" class="d-flex flex-column align-items-center justify-content-center text-center p-4 rounded border bg-light text-muted" style="min-height: 140px; display: none;">
+                                        <i class="bi bi-cloud-slash text-danger" style="font-size: 2rem; margin-bottom: 8px;"></i>
+                                        <span class="fw-bold" style="font-size: 13px;">Device sedang dalam keadaan offline</span>
+                                        <span class="small text-muted" style="font-size: 10px; margin-top: 4px;">Aktifkan alat untuk menggunakan kontrol manual.</span>
+                                    </div>
                                 </div>
                                 
                                 <!-- Mode Otomatis -->
                                 <div class="tab-pane fade" id="panel-otomatis" role="tabpanel">
-                                    <div class="p-3 border rounded bg-white shadow-sm mt-2">
+                                    <!-- Form Kontrol Otomatis -->
+                                    <div id="otomatis-controls-form" class="p-3 border rounded bg-white shadow-sm mt-2">
                                         <p class="text-center small text-muted mb-3" id="otomatis-deskripsi">Atur jadwal presisi untuk otomatisasi Kipas dan Syringe tanpa intervensi manual.</p>
                                         <div id="otomatis-list-container" class="mb-3 custom-scrollbar" style="display: none; max-height: 120px; overflow-y: auto;">
                                             <!-- Daftar Jadwal akan diisi oleh JS -->
@@ -238,6 +246,12 @@
                                         <button class="btn btn-primary btn-sm w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#modalJadwal">
                                             <i class="bi bi-calendar-plus"></i> Buka Editor Jadwal
                                         </button>
+                                    </div>
+                                    <!-- Alert Offline Otomatis -->
+                                    <div id="otomatis-offline-alert" class="d-flex flex-column align-items-center justify-content-center text-center p-4 rounded border bg-light text-muted mt-2" style="min-height: 140px; display: none;">
+                                        <i class="bi bi-cloud-slash text-danger" style="font-size: 2rem; margin-bottom: 8px;"></i>
+                                        <span class="fw-bold" style="font-size: 13px;">Device sedang dalam keadaan offline</span>
+                                        <span class="small text-muted" style="font-size: 10px; margin-top: 4px;">Aktifkan alat untuk menggunakan kontrol otomatis.</span>
                                     </div>
                                 </div>
                             </div>
