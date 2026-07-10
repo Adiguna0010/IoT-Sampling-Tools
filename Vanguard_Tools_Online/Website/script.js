@@ -3,7 +3,7 @@
 // ==========================================
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : 'https://adiguna16-iot-chamber-backend.hf.space'; // URL Hugging Face Space Anda
+    : 'https://iot-chamber-backend.vercel.app'; // URL Vercel Backend Anda
 
 // ==========================================
 // 1. OTORISASI (CEK LOGIN)
