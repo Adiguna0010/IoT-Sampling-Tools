@@ -171,7 +171,7 @@ function buatCard(id) {
                 </label>
             </div>
             <div class="ctrl-row">
-                <span><i class="bi bi-syringe text-secondary"></i> Syringe <span id="syringe-presence-${safeId}" class="badge bg-secondary" style="font-size:9px;">Cek</span></span>
+                <span><i class="bi bi-syringe text-secondary"></i> Syringe <span id="syringe-presence-${safeId}" class="badge bg-secondary" style="font-size:9px;">Cek</span> <span id="syringe-pos-${safeId}" class="badge bg-secondary" style="font-size:9px;">Di Tengah</span></span>
                 <div class="btn-group-tiny">
                     <button id="btn-up-${safeId}" onclick="moveSyringe('${id}', 'U')" disabled>UP</button>
                     <button id="btn-down-${safeId}" onclick="moveSyringe('${id}', 'D')" disabled>DWN</button>
@@ -331,6 +331,42 @@ async function bukaDetail(chamberId) {
             document.getElementById("detail-kelembapan").innerText = `${jsonLatest.data.kelembaban} %`;
             document.getElementById("detail-tekanan").innerText = `${jsonLatest.data.tekanan} hPa`;
             document.getElementById("detail-metana").innerText = `${jsonLatest.data.gas_metana} ppm`;
+            
+            // Set initial syringe presence status in detail modal
+            const detailBadge = document.getElementById("detail-ctrl-badge");
+            const dBtnUp = document.getElementById("detail-btn-up");
+            const dBtnDown = document.getElementById("detail-btn-down");
+            const isPresent = jsonLatest.data.syringe_present || 0;
+            if (detailBadge && dBtnUp && dBtnDown) {
+                if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                    detailBadge.innerText = "Syringe Siap";
+                    detailBadge.className = "badge bg-success ms-1";
+                    dBtnUp.disabled = false;
+                    dBtnDown.disabled = false;
+                } else {
+                    detailBadge.innerText = "Syringe Kosong";
+                    detailBadge.className = "badge bg-danger ms-1";
+                    dBtnUp.disabled = true;
+                    dBtnDown.disabled = true;
+                }
+            }
+
+            // Set initial syringe position status in detail modal
+            const dPosBadge = document.getElementById("detail-syringe-pos");
+            if (dPosBadge) {
+                const limitAtas = jsonLatest.data.limit_atas || 0;
+                const limitBawah = jsonLatest.data.limit_bawah || 0;
+                if (limitAtas == 1) {
+                    dPosBadge.innerText = "Atas (Full)";
+                    dPosBadge.className = "badge bg-info ms-1";
+                } else if (limitBawah == 1) {
+                    dPosBadge.innerText = "Bawah (Tutup)";
+                    dPosBadge.className = "badge bg-warning text-dark ms-1";
+                } else {
+                    dPosBadge.innerText = "Di Tengah";
+                    dPosBadge.className = "badge bg-secondary ms-1";
+                }
+            }
         }
 
         // Ambil Data History untuk Chart dan Tabel
@@ -727,6 +763,23 @@ async function fetchData() {
                         }
                     }
                     
+                    // Update syringe position badge on card
+                    const posBadge = document.getElementById(`syringe-pos-${safeId}`);
+                    if (posBadge) {
+                        const limitAtas = data.limit_atas || 0;
+                        const limitBawah = data.limit_bawah || 0;
+                        if (limitAtas == 1) {
+                            posBadge.innerText = "Atas (Full)";
+                            posBadge.className = "badge bg-info";
+                        } else if (limitBawah == 1) {
+                            posBadge.innerText = "Bawah (Tutup)";
+                            posBadge.className = "badge bg-warning text-dark";
+                        } else {
+                            posBadge.innerText = "Di Tengah";
+                            posBadge.className = "badge bg-secondary";
+                        }
+                    }
+                    
                     // Update status di Modal Detail (jika sedang terbuka)
                     if (currentDetailChamber === chamberId) {
                         if(document.getElementById('detail-suhu')) {
@@ -792,6 +845,23 @@ async function fetchData() {
                                 detailBadge.className = "badge bg-danger ms-1";
                                 dBtnUp.disabled = true;
                                 dBtnDown.disabled = true;
+                            }
+                        }
+                        
+                        // Update syringe position badge in detail modal
+                        const dPosBadge = document.getElementById("detail-syringe-pos");
+                        if (dPosBadge) {
+                            const limitAtas = data.limit_atas || 0;
+                            const limitBawah = data.limit_bawah || 0;
+                            if (limitAtas == 1) {
+                                dPosBadge.innerText = "Atas (Full)";
+                                dPosBadge.className = "badge bg-info ms-1";
+                            } else if (limitBawah == 1) {
+                                dPosBadge.innerText = "Bawah (Tutup)";
+                                dPosBadge.className = "badge bg-warning text-dark ms-1";
+                            } else {
+                                dPosBadge.innerText = "Di Tengah";
+                                dPosBadge.className = "badge bg-secondary ms-1";
                             }
                         }
                     }

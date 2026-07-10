@@ -167,6 +167,26 @@ function initializeDatabaseSchema(connectionOrPool) {
                     });
                 }
             });
+
+            // Menambahkan kolom limit_atas ke sensor_data secara otomatis (Jika belum ada)
+            connectionOrPool.query("SHOW COLUMNS FROM sensor_data LIKE 'limit_atas'", (errCol, results) => {
+                if (!errCol && results && results.length === 0) {
+                    connectionOrPool.query("ALTER TABLE sensor_data ADD COLUMN limit_atas INT DEFAULT 0", (errAdd) => {
+                        if (errAdd) console.error("[❌] Gagal menambah kolom limit_atas:", errAdd.message);
+                        else console.log("Kolom 'limit_atas' berhasil ditambahkan otomatis ke tabel sensor_data! ✅");
+                    });
+                }
+            });
+
+            // Menambahkan kolom limit_bawah ke sensor_data secara otomatis (Jika belum ada)
+            connectionOrPool.query("SHOW COLUMNS FROM sensor_data LIKE 'limit_bawah'", (errCol, results) => {
+                if (!errCol && results && results.length === 0) {
+                    connectionOrPool.query("ALTER TABLE sensor_data ADD COLUMN limit_bawah INT DEFAULT 0", (errAdd) => {
+                        if (errAdd) console.error("[❌] Gagal menambah kolom limit_bawah:", errAdd.message);
+                        else console.log("Kolom 'limit_bawah' berhasil ditambahkan otomatis ke tabel sensor_data! ✅");
+                    });
+                }
+            });
         }
     });
 }
@@ -477,7 +497,7 @@ app.get('/api/debug-db', (req, res) => {
 // 3. POST /api/data (Menerima Data dari ESP & Mengirim Perintah)
 // ==========================================
 app.post('/api/data', (req, res) => {
-    const { device, suhu, kelembaban, tekanan, gas_metana, syringe_present } = req.body;
+    const { device, suhu, kelembaban, tekanan, gas_metana, syringe_present, limit_atas, limit_bawah } = req.body;
     
     if (!device || suhu === undefined) {
         return res.status(400).json({ status: "gagal", pesan: "Format data tidak valid" });
@@ -489,9 +509,9 @@ app.post('/api/data', (req, res) => {
     db.query(upsertDevice, [device]);
 
     // 2. Simpan Data Sensor
-    const insertDataQuery = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana, syringe_present, waktu_masuk) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())';
+    const insertDataQuery = 'INSERT INTO sensor_data (nama_device, nama_sensor, suhu, kelembaban, tekanan, gas_metana, syringe_present, limit_atas, limit_bawah, waktu_masuk) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())';
     
-    db.query(insertDataQuery, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana, syringe_present || 0], (err, results) => {
+    db.query(insertDataQuery, [device, 'sensor_rata_rata', suhu, kelembaban, tekanan, gas_metana, syringe_present || 0, limit_atas || 0, limit_bawah || 0], (err, results) => {
         if (err) {
             console.error('\n[❌] Gagal menyimpan ke MySQL:', err.message);
             return res.status(500).json({ status: "gagal", pesan: err.message });
@@ -507,7 +527,9 @@ app.post('/api/data', (req, res) => {
                 kelembaban: kelembaban,
                 tekanan: tekanan,
                 gas_metana: gas_metana,
-                syringe_present: syringe_present
+                syringe_present: syringe_present,
+                limit_atas: limit_atas || 0,
+                limit_bawah: limit_bawah || 0
             }
         });
         

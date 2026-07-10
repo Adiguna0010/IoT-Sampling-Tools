@@ -116,6 +116,8 @@ void taskSensorDanWiFi(void * pvParameters) {
     
     // Status syringe: 1 jika ready (LS3 aktif), 0 jika tidak
     int isSyringePresent = (USE_LIMIT_SWITCHES) ? (bacaSensorStabil(limitSyringePin, LIMIT_SYRINGE_ACTIVE_STATE) ? 1 : 0) : 1;
+    int isLimitAtas = bacaSensorStabil(limitAtasPin, LIMIT_ATAS_ACTIVE_STATE) ? 1 : 0;
+    int isLimitBawah = bacaSensorStabil(limitBawahPin, LIMIT_BAWAH_ACTIVE_STATE) ? 1 : 0;
 
     // --- TAMPILKAN KE SERIAL MONITOR ---
     Serial.println("\n=== HASIL PEMBACAAN SENSOR (AVERAGED) ===");
@@ -126,6 +128,8 @@ void taskSensorDanWiFi(void * pvParameters) {
     Serial.printf("Rata-rata Tekanan   : %.2f hPa\n", avgTekanan);
     Serial.printf("Rata-rata Gas PPM   : %d PPM\n", avgGasPPM);
     Serial.printf("Status Syringe (LS3): %s\n", isSyringePresent ? "READY" : "NOT READY");
+    Serial.printf("Limit Atas (LS1)    : %s\n", isLimitAtas ? "TRIGGERED" : "NORMAL");
+    Serial.printf("Limit Bawah (LS2)   : %s\n", isLimitBawah ? "TRIGGERED" : "NORMAL");
     Serial.println("--- RAW LIMIT SWITCH STATES (DIAGNOSTIC) ---");
     Serial.printf("Limit Atas (Pin %d)    : %d (Active State: %s)\n", limitAtasPin, digitalRead(limitAtasPin), LIMIT_ATAS_ACTIVE_STATE == LOW ? "LOW" : "HIGH");
     Serial.printf("Limit Bawah (Pin %d)   : %d (Active State: %s)\n", limitBawahPin, digitalRead(limitBawahPin), LIMIT_BAWAH_ACTIVE_STATE == LOW ? "LOW" : "HIGH");
@@ -139,7 +143,9 @@ void taskSensorDanWiFi(void * pvParameters) {
     jsonPayload += "\"kelembaban\": " + String(avgKelembaban, 2) + ", ";
     jsonPayload += "\"tekanan\": " + String(avgTekanan, 2) + ", ";
     jsonPayload += "\"gas_metana\": " + String(avgGasPPM) + ", "; 
-    jsonPayload += "\"syringe_present\": " + String(isSyringePresent);
+    jsonPayload += "\"syringe_present\": " + String(isSyringePresent) + ", ";
+    jsonPayload += "\"limit_atas\": " + String(isLimitAtas) + ", ";
+    jsonPayload += "\"limit_bawah\": " + String(isLimitBawah);
     jsonPayload += "}";
 
     // --- KIRIM HTTP POST JIKA WIFI TERHUBUNG ---
