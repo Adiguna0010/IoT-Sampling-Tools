@@ -12,15 +12,19 @@ const char* serverUrl = "https://iot-chamber-backend.vercel.app/api/data";
 // ================= KONFIGURASI PIN =================
 #define SDA_PIN           21
 #define SCL_PIN           22
-#define MQ4_1_PIN         34  
-#define MQ4_2_PIN         35  
-#define RELAY_KIPAS_PIN   25  
 
-const int dirPin = 26;   
-const int stepPin = 27;  
-const int limitAtasPin = 32;    
-const int limitBawahPin = 33;   
-const int limitSyringePin = 4;  
+#define MQ4_1_PIN         32  
+#define MQ4_2_PIN         33  
+#define MQ4_3_PIN         34  
+
+#define RELAY_KIPAS_PIN   4  
+
+const int dirPin = 14;   
+const int stepPin = 13;  
+
+const int limitAtasPin = 25;    // LS1 (Atas / Narik Full)
+const int limitBawahPin = 26;   // LS2 (Bawah / Tutup)
+const int limitSyringePin = 27; // LS3 (Syringe Ready / Tersedia)
 
 // ================= VARIABEL GLOBAL =================
 Adafruit_BME280 bmeAtas;  
@@ -50,19 +54,19 @@ int hitungPPM(int nilaiAnalog) {
 // ================= TUGAS CORE 0 (SENSOR & WIFI) =================
 void taskSensorDanWiFi(void * pvParameters) {
   for(;;) {
-    // PERUBAHAN: Jeda diubah menjadi 3 detik (3000 ms)
     vTaskDelay(3000 / portTICK_PERIOD_MS); 
 
     // --- PENGAMBILAN SAMPLE 1 ---
     float t1_a = bmeAtas.readTemperature();
     float h1_a = bmeAtas.readHumidity();
     float p1_a = bmeAtas.readPressure() / 100.0F;
-    int mq1_a_ppm = hitungPPM(analogRead(MQ4_1_PIN));
+    int mq1_1 = hitungPPM(analogRead(MQ4_1_PIN));
+    int mq1_2 = hitungPPM(analogRead(MQ4_2_PIN));
+    int mq1_3 = hitungPPM(analogRead(MQ4_3_PIN));
 
     float t1_b = bmeBawah.readTemperature();
     float h1_b = bmeBawah.readHumidity();
     float p1_b = bmeBawah.readPressure() / 100.0F;
-    int mq1_b_ppm = hitungPPM(analogRead(MQ4_2_PIN));
 
     vTaskDelay(2000 / portTICK_PERIOD_MS); // Jeda 2 detik antar sample
 
@@ -70,25 +74,26 @@ void taskSensorDanWiFi(void * pvParameters) {
     float t2_a = bmeAtas.readTemperature();
     float h2_a = bmeAtas.readHumidity();
     float p2_a = bmeAtas.readPressure() / 100.0F;
-    int mq2_a_ppm = hitungPPM(analogRead(MQ4_1_PIN));
+    int mq2_1 = hitungPPM(analogRead(MQ4_1_PIN));
+    int mq2_2 = hitungPPM(analogRead(MQ4_2_PIN));
+    int mq2_3 = hitungPPM(analogRead(MQ4_3_PIN));
 
     float t2_b = bmeBawah.readTemperature();
     float h2_b = bmeBawah.readHumidity();
     float p2_b = bmeBawah.readPressure() / 100.0F;
-    int mq2_b_ppm = hitungPPM(analogRead(MQ4_2_PIN));
 
     // --- KALKULASI RATA-RATA ---
     float avgSuhu = (t1_a + t1_b + t2_a + t2_b) / 4.0;
     float avgKelembaban = (h1_a + h1_b + h2_a + h2_b) / 4.0;
     float avgTekanan = (p1_a + p1_b + p2_a + p2_b) / 4.0;
-    int avgGasPPM = (mq1_a_ppm + mq1_b_ppm + mq2_a_ppm + mq2_b_ppm) / 4;
+    int avgGasPPM = (mq1_1 + mq1_2 + mq1_3 + mq2_1 + mq2_2 + mq2_3) / 6;
     int isSyringePresent = bacaSensorStabil(limitSyringePin, LOW) ? 1 : 0;
 
     // --- TAMPILKAN KE SERIAL MONITOR ---
     Serial.println("\n=== HASIL PEMBACAAN SENSOR ===");
     Serial.printf("BME280 Atas  - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t2_a, h2_a, p2_a);
     Serial.printf("BME280 Bawah - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t2_b, h2_b, p2_b);
-    Serial.printf("MQ-4 Atas    : %d PPM | MQ-4 Bawah : %d PPM\n", mq2_a_ppm, mq2_b_ppm);
+    Serial.printf("MQ-4 Gas     - Metana: %d PPM\n", avgGasPPM);
     Serial.println("--- NILAI AVERAGE (DIKIRIM KE SERVER) ---");
     Serial.printf("Suhu: %.2f | Kelembaban: %.2f | Tekanan: %.2f | Gas: %d PPM\n", avgSuhu, avgKelembaban, avgTekanan, avgGasPPM);
     Serial.println("================================\n");
@@ -152,12 +157,16 @@ void prosesPerintah(String cmd) {
       motorState = 1;
       digitalWrite(dirPin, HIGH);
       Serial.println("Status: Motor NAIK (Up)");
+    } else {
+      Serial.println("Gerak NAIK ditolak: Limit Atas terdeteksi!");
     }
   } else if (cmd == "D") {
     if (!bacaSensorStabil(limitBawahPin, LOW)) { 
       motorState = 2;
       digitalWrite(dirPin, LOW);
       Serial.println("Status: Motor TURUN (Down)");
+    } else {
+      Serial.println("Gerak TURUN ditolak: Limit Bawah terdeteksi!");
     }
   } else if (cmd == "S" || cmd == "STOP") {
     motorState = 0;
