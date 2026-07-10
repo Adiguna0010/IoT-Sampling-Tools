@@ -312,9 +312,27 @@ async function bukaDetail(chamberId) {
     const kipasSwitch = document.getElementById("detail-kipas-switch");
     const btnUp = document.getElementById("detail-btn-up");
     const btnDown = document.getElementById("detail-btn-down");
-        if (kipasSwitch) kipasSwitch.onchange = () => toggleKipas(chamberId, null, kipasSwitch.checked, kipasSwitch);
-        if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, 'U');
-        if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, 'D');
+    
+    // Cek status koneksi alat
+    const isDeviceOnline = chamberStatuses[chamberId] === 'Online';
+    const statusBadge = document.getElementById("detail-status-badge");
+    if (statusBadge) {
+        if (isDeviceOnline) {
+            statusBadge.innerText = "Online";
+            statusBadge.className = "badge bg-success ms-2";
+        } else {
+            statusBadge.innerText = "Offline";
+            statusBadge.className = "badge bg-danger ms-2";
+        }
+    }
+
+    if (kipasSwitch) {
+        kipasSwitch.onchange = () => toggleKipas(chamberId, null, kipasSwitch.checked, kipasSwitch);
+        kipasSwitch.disabled = !isDeviceOnline;
+        if (!isDeviceOnline) kipasSwitch.checked = false;
+    }
+    if (btnUp) btnUp.onclick = () => moveSyringe(chamberId, 'U');
+    if (btnDown) btnDown.onclick = () => moveSyringe(chamberId, 'D');
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetail'));
     modal.show();
@@ -338,7 +356,12 @@ async function bukaDetail(chamberId) {
             const dBtnDown = document.getElementById("detail-btn-down");
             const isPresent = jsonLatest.data.syringe_present || 0;
             if (detailBadge && dBtnUp && dBtnDown) {
-                if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                if (!isDeviceOnline) {
+                    detailBadge.innerText = "Device Offline";
+                    detailBadge.className = "badge bg-secondary ms-1";
+                    dBtnUp.disabled = true;
+                    dBtnDown.disabled = true;
+                } else if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
                     detailBadge.innerText = "Syringe Siap";
                     detailBadge.className = "badge bg-success ms-1";
                     dBtnUp.disabled = false;
@@ -791,6 +814,25 @@ async function fetchData() {
                             // Cek apakah ada data baru dan device Online
                             const isNewData = !lastProcessedDataId[chamberId] || lastProcessedDataId[chamberId] !== data.id;
                             const isDeviceOnline = chamberStatuses[chamberId] === 'Online';
+                             
+                             // Update Status Badge (Online/Offline) in detail modal header
+                             const statusBadge = document.getElementById("detail-status-badge");
+                             if (statusBadge) {
+                                 if (isDeviceOnline) {
+                                     statusBadge.innerText = "Online";
+                                     statusBadge.className = "badge bg-success ms-2";
+                                 } else {
+                                     statusBadge.innerText = "Offline";
+                                     statusBadge.className = "badge bg-danger ms-2";
+                                 }
+                             }
+                             
+                             // Disable/enable kipas switch dynamically based on status
+                             const kipasSwitch = document.getElementById("detail-kipas-switch");
+                             if (kipasSwitch) {
+                                 kipasSwitch.disabled = !isDeviceOnline;
+                                 if (!isDeviceOnline) kipasSwitch.checked = false;
+                             }
                             
                             if (isNewData && isDeviceOnline) {
                                 lastProcessedDataId[chamberId] = data.id;
@@ -835,7 +877,12 @@ async function fetchData() {
                         const dBtnUp = document.getElementById("detail-btn-up");
                         const dBtnDown = document.getElementById("detail-btn-down");
                         if (detailBadge && dBtnUp && dBtnDown) {
-                            if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
+                            if (!isDeviceOnline) {
+                                detailBadge.innerText = "Device Offline";
+                                detailBadge.className = "badge bg-secondary ms-1";
+                                dBtnUp.disabled = true;
+                                dBtnDown.disabled = true;
+                            } else if (isPresent == 1 || isPresent == "ada" || isPresent == "yes") {
                                 detailBadge.innerText = "Syringe Siap";
                                 detailBadge.className = "badge bg-success ms-1";
                                 dBtnUp.disabled = false;
