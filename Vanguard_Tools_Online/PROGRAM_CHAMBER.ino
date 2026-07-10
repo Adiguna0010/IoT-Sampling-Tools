@@ -30,7 +30,7 @@ const int limitSyringePin = 27; // LS3 (Syringe Ready / Tersedia)
 // Sesuaikan dengan tipe saklar Anda:
 // - Set ke LOW jika tipe NO (Normally Open / Terhubung GND saat ditekan)
 // - Set ke HIGH jika tipe NC (Normally Closed / Terlepas dari GND saat ditekan)
-const int LIMIT_ATAS_ACTIVE_STATE = LOW;   // <--- Ubah ke HIGH jika tombol UP terbalik terdeteksinya
+const int LIMIT_ATAS_ACTIVE_STATE = HIGH;   // <--- Ubah ke HIGH jika tombol UP terbalik terdeteksinya
 const int LIMIT_BAWAH_ACTIVE_STATE = LOW;
 const int LIMIT_SYRINGE_ACTIVE_STATE = LOW;
 
