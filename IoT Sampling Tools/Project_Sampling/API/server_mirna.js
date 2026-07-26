@@ -416,7 +416,7 @@ app.get('/api/devices', (req, res) => {
 // API GET HISTORY (Untuk Log Activity)
 // ==========================================
 app.get('/api/data/history/:device', (req, res) => {
-    const query = 'SELECT * FROM sensor_data WHERE nama_device = ? ORDER BY id DESC LIMIT 30';
+    const query = 'SELECT * FROM sensor_data WHERE nama_device = ? ORDER BY id DESC LIMIT 300';
     db.query(query, [req.params.device], (err, results) => {
         if (err) return res.status(500).json({ status: "gagal" });
         res.json({ status: "berhasil", data: results });

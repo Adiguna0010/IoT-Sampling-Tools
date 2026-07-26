@@ -450,6 +450,9 @@ async function bukaDetail(chamberId) {
             });
             document.getElementById("logTableBody").innerHTML = html;
             
+            const defaultMinLabel = labels.length > 15 ? labels[labels.length - 15] : labels[0];
+            const defaultMaxLabel = labels.length > 0 ? labels[labels.length - 1] : undefined;
+
             const ctx = document.getElementById('historyChart').getContext('2d');
             if(historyChartInstance) historyChartInstance.destroy();
             historyChartInstance = new Chart(ctx, {
@@ -478,11 +481,16 @@ async function bukaDetail(chamberId) {
                                 wheel: { enabled: true },
                                 pinch: { enabled: true },
                                 mode: 'x'
+                            },
+                            limits: {
+                                x: { min: 'original', max: 'original' }
                             }
                         }
                     },
                     scales: {
                         x: {
+                            min: defaultMinLabel,
+                            max: defaultMaxLabel,
                             grid: { color: 'rgba(255, 255, 255, 0.08)' },
                             ticks: { color: 'rgba(255, 255, 255, 0.6)' }
                         },
