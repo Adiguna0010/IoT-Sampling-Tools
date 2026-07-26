@@ -669,7 +669,7 @@ app.delete('/api/schedules/:id', (req, res) => {
 // ==========================================
 app.get('/api/weather', async (req, res) => {
     try {
-        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-7.7956&longitude=110.3695&current_weather=true');
+        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-7.7956&longitude=110.3695&current_weather=true&timezone=Asia%2FJakarta');
         const data = await response.json();
         res.json(data);
     } catch (error) {

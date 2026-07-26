@@ -20,6 +20,9 @@ function logout() {
 
 let myChart;
 let historyChartInstance;
+if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
+    Chart.register(ChartZoom);
+}
 let currentDetailChamber = ""; // Menyimpan chamber yang sedang dibuka detailnya
 // Coba ambil dari LocalStorage, jika kosong gunakan default ['Chamber 1']
 let activeChambers = JSON.parse(localStorage.getItem('savedChambers')) || ['Chamber 1'];
@@ -464,7 +467,19 @@ async function bukaDetail(chamberId) {
                     responsive: true, 
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false } // Sembunyikan legend bawaan, pakai dropdown
+                        legend: { display: false },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                                modifierKey: null
+                            },
+                            zoom: {
+                                wheel: { enabled: true },
+                                pinch: { enabled: true },
+                                mode: 'x'
+                            }
+                        }
                     },
                     scales: {
                         x: {
@@ -704,7 +719,7 @@ async function fetchWeather() {
             const code = result.current_weather.weathercode;
             if (code >= 1 && code <= 3) icon = "⛅";
             else if (code >= 51 && code <= 67) icon = "🌧️";
-            document.getElementById("cuaca").innerHTML = `${icon} ${result.current_weather.temperature}°C`;
+            document.getElementById("cuaca").innerHTML = `${icon} ${Math.round(result.current_weather.temperature)}°C`;
         }
     } catch (e) {
         document.getElementById("cuaca").innerHTML = `Gagal Memuat Cuaca`;
@@ -732,7 +747,19 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x'
+                    }
+                }
             },
             scales: {
                 x: {
@@ -874,8 +901,8 @@ async function fetchData() {
                                     historyChartInstance.data.datasets[2].data.push(data.tekanan);
                                     historyChartInstance.data.datasets[3].data.push(data.gas_metana);
                                     
-                                    // Geser grafik jika kepanjangan
-                                    if(historyChartInstance.data.labels.length > 50) {
+                                    // Geser grafik jika data sudah melebihi 500 poin
+                                    if(historyChartInstance.data.labels.length > 500) {
                                         historyChartInstance.data.labels.shift();
                                         historyChartInstance.data.datasets.forEach(dataset => dataset.data.shift());
                                     }
@@ -1219,6 +1246,12 @@ async function fetchServerHealth() {
         document.getElementById("sh-users").innerText = data.total_users;
     } catch(e) {
         if(document.getElementById("sh-uptime")) document.getElementById("sh-uptime").innerText = "Server Error";
+    }
+}
+
+function resetHistoryChartZoom() {
+    if (historyChartInstance) {
+        historyChartInstance.resetZoom();
     }
 }
 
