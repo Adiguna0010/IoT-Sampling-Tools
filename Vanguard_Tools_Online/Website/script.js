@@ -1492,9 +1492,6 @@ function renderNotificationsPage() {
         
         html += `
             <div class="p-3 mb-2 rounded d-flex align-items-center gap-3 ${itemClass}" style="background: ${bgClass}; transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.02);">
-                <div class="p-2 rounded d-flex align-items-center justify-content-center" style="font-size: 18px; width: 36px; height: 36px; background-color: rgba(255,255,255,0.05) !important;">
-                    <i class="bi ${n.icon} text-info"></i>
-                </div>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <h6 class="mb-1 text-white" style="font-size: 13px; font-weight: 600; line-height: 1.4;">${n.text}</h6>
                     <span class="text-muted small" style="font-size: 10px; opacity: 0.6;"><i class="bi bi-clock me-1"></i>${formatTimeAgo(n.time)}</span>
