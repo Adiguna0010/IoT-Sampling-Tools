@@ -644,6 +644,20 @@ async function fetchData() {
                             }
                         }
                         
+                        // Auto-sync status saklar Kipas pada modal & kartu utama dari kipas_state
+                        const detailKipasSwitch = document.getElementById("detail-kipas-switch");
+                        const safeId = currentDetailChamber.replace(/\s+/g, '-');
+                        const cardKipasSwitch = document.getElementById(`kipas-${safeId}`);
+                        if (data.kipas_state !== undefined) {
+                            const isFanOn = (data.kipas_state == 1);
+                            if (detailKipasSwitch && document.activeElement !== detailKipasSwitch) {
+                                detailKipasSwitch.checked = isFanOn;
+                            }
+                            if (cardKipasSwitch && document.activeElement !== cardKipasSwitch) {
+                                cardKipasSwitch.checked = isFanOn;
+                            }
+                        }
+
                         const detailBadge = document.getElementById("detail-ctrl-badge");
                         const dBtnUp = document.getElementById("detail-btn-up");
                         const dBtnDown = document.getElementById("detail-btn-down");

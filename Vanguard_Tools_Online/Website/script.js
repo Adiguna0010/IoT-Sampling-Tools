@@ -373,6 +373,15 @@ async function bukaDetail(chamberId) {
             document.getElementById("detail-tekanan").innerText = `${jsonLatest.data.tekanan} hPa`;
             document.getElementById("detail-metana").innerText = `${jsonLatest.data.gas_metana} ppm`;
             
+            // Auto sync status switch kipas di detail modal dari data terbaru/jadwal
+            if (kipasSwitch && jsonLatest.data.kipas_state !== undefined) {
+                kipasSwitch.checked = (jsonLatest.data.kipas_state == 1);
+            }
+            const cardKipas = document.getElementById(`kipas-${safeId}`);
+            if (cardKipas && jsonLatest.data.kipas_state !== undefined) {
+                cardKipas.checked = (jsonLatest.data.kipas_state == 1);
+            }
+            
             // Set initial syringe presence status in detail modal
             const detailBadge = document.getElementById("detail-ctrl-badge");
             const dBtnUp = document.getElementById("detail-btn-up");
@@ -966,6 +975,20 @@ async function fetchData() {
                             }
                         }
                         
+                        // Auto-sync status saklar Kipas pada modal & kartu utama dari kipas_state
+                        const detailKipasSwitch = document.getElementById("detail-kipas-switch");
+                        const safeId = currentDetailChamber.replace(/\s+/g, '-');
+                        const cardKipasSwitch = document.getElementById(`kipas-${safeId}`);
+                        if (data.kipas_state !== undefined) {
+                            const isFanOn = (data.kipas_state == 1);
+                            if (detailKipasSwitch && document.activeElement !== detailKipasSwitch) {
+                                detailKipasSwitch.checked = isFanOn;
+                            }
+                            if (cardKipasSwitch && document.activeElement !== cardKipasSwitch) {
+                                cardKipasSwitch.checked = isFanOn;
+                            }
+                        }
+
                         // Update syringe position badge in detail modal & auto-disable invalid direction buttons
                         const dPosBadge = document.getElementById("detail-syringe-pos");
                         if (dPosBadge) {

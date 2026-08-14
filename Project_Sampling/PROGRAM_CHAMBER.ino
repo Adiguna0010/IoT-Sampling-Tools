@@ -79,7 +79,7 @@ Adafruit_BME280 bmeBawah;
 
 String command = "";
 int motorState = 0; // 0 = STOP, 1 = NAIK, 2 = TURUN
-int fanState = 0;   
+int fanState = 0;   // 0 = OFF, 1 = ON
 
 TaskHandle_t TaskSensorWiFi; 
 
@@ -146,12 +146,14 @@ void taskSensorDanWiFi(void * pvParameters) {
       Serial.printf("MQ-4 Gas     - Sensor 1: %d PPM | Sensor 2: %d PPM | Sensor 3: %d PPM\n", mq_1, mq_2, mq_3);
       Serial.println("---------------- RATA-RATA (DIKIRIM KE VERCEL) ----------------");
       Serial.printf("Suhu Rata-rata: %.2f C | Kelembaban: %.2f %% | Gas Metana: %d PPM\n", avgSuhu, avgKelembaban, avgGasPPM);
-      Serial.println("---------------- STATUS SAKLAR LIMIT SWITCH ------------------");
+      Serial.println("---------------- STATUS SAKLAR LIMIT SWITCH & KIPAS ------------");
       Serial.printf("Limit Atas (LS1)    : %s (RAW: %d)\n", isLimitAtas ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitAtasPin));
       Serial.printf("Limit Bawah (LS2)   : %s (RAW: %d)\n", isLimitBawah ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitBawahPin));
       Serial.printf("Limit Syringe (LS3) : %s (RAW: %d)\n", isSyringePresent ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitSyringePin));
+      Serial.printf("Status Kipas (Relay): %s\n", fanState == 1 ? "ON (1)" : "OFF (0)");
       Serial.println("==============================================================\n");
 
+      // FORMAT JSON LENGKAP TERMASUK kipas_state UNTUK AUTO-SYNC WEBSITE
       String jsonPayload = "{";
       jsonPayload += "\"device\": \"Chamber 1\", ";
       jsonPayload += "\"suhu\": " + String(avgSuhu, 2) + ", ";
@@ -160,7 +162,8 @@ void taskSensorDanWiFi(void * pvParameters) {
       jsonPayload += "\"gas_metana\": " + String(avgGasPPM) + ", "; 
       jsonPayload += "\"syringe_present\": " + String(isSyringePresent) + ", ";
       jsonPayload += "\"limit_atas\": " + String(isLimitAtas) + ", ";
-      jsonPayload += "\"limit_bawah\": " + String(isLimitBawah);
+      jsonPayload += "\"limit_bawah\": " + String(isLimitBawah) + ", ";
+      jsonPayload += "\"kipas_state\": " + String(fanState);
       jsonPayload += "}";
 
       if (WiFi.status() == WL_CONNECTED) {
@@ -173,7 +176,6 @@ void taskSensorDanWiFi(void * pvParameters) {
           String response = http.getString();
           Serial.printf("[HTTP SERVER] Data terkirim! Respon HTTP: %d\n", httpResponseCode);
           
-          // Mengambil HANYA 1 Perintah Terbaru untuk Mencegah Motor Kagok
           String latestCmd = getLatestCommandValue(response);
           if (latestCmd != "") {
             Serial.println("[COMMAND] Perintah Tunggal Terbaru Diterima: " + latestCmd);
