@@ -896,12 +896,42 @@ async function toggleKipas(chamberId, safeId, isChecked, toggleElement) {
     }
 }
 
+function showWarningBanner(msg) {
+    alert(msg);
+    let container = document.getElementById("toast-warning-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-warning-container";
+        container.style.cssText = "position: fixed; top: 75px; right: 25px; z-index: 99999; max-width: 380px;";
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement("div");
+    toast.className = "alert alert-warning alert-dismissible fade show shadow-lg border-warning text-dark fw-bold mb-2 p-3";
+    toast.style.cssText = "border-left: 6px solid #ffc107; font-size: 13px; background-color: #fff3cd;";
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill text-warning fs-4 me-2"></i>
+            <div>${msg}</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast && toast.parentNode) {
+            toast.classList.remove("show");
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
 async function moveSyringe(chamberId, direction) {
     if(userRole === "user") return;
     const safeId = chamberId.replace(/\s+/g, '-');
     const presenceBadge = document.getElementById(`syringe-presence-${safeId}`) ? document.getElementById(`syringe-presence-${safeId}`).innerText : "Kosong";
     if (presenceBadge === "Kosong" || presenceBadge === "Cek") {
-        alert("⚠️ PERINGATAN: Tidak ada syringe terdeteksi di alat (LS3 Terlepas)!");
+        showWarningBanner("⚠️ PERINGATAN: Tidak ada syringe terdeteksi di alat (LS3 Terlepas)!");
         return;
     }
 
@@ -918,11 +948,13 @@ async function moveSyringe(chamberId, direction) {
     }
 
     if (direction === 'D' && (posText.includes("bawah") || posText.includes("tutup"))) {
-        alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling BAWAH (Limit Bawah Aktif)! Perintah Turun Ditolak.");
+        showWarningBanner("⚠️ PERINGATAN: Syringe sudah berada di posisi paling BAWAH (Limit Bawah Aktif)! Perintah Turun Ditolak.");
+        addNotification(`⚠️ Perintah TURUN ${chamberId} ditolak: Syringe sudah di posisi paling BAWAH!`, "bi-exclamation-triangle-fill");
         return;
     }
     if (direction === 'U' && (posText.includes("atas") || posText.includes("buka") || posText.includes("full"))) {
-        alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling ATAS (Limit Atas Aktif)! Perintah Naik Ditolak.");
+        showWarningBanner("⚠️ PERINGATAN: Syringe sudah berada di posisi paling ATAS (Limit Atas Aktif)! Perintah Naik Ditolak.");
+        addNotification(`⚠️ Perintah NAIK ${chamberId} ditolak: Syringe sudah di posisi paling ATAS!`, "bi-exclamation-triangle-fill");
         return;
     }
 
@@ -933,7 +965,7 @@ async function moveSyringe(chamberId, direction) {
         
         addNotification(`Syringe ${chamberId} digerakkan (${direction === 'U' ? 'UP' : 'DOWN'})`, "bi-arrow-down-up");
     } catch (error) {
-        alert("Gagal menggerakkan syringe. Pastikan koneksi server aktif.");
+        showWarningBanner("Gagal menggerakkan syringe. Pastikan koneksi server aktif.");
     }
 }
 

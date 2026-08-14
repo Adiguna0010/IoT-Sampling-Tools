@@ -544,28 +544,66 @@ app.post('/api/data', (req, res) => {
             }
         });
         
-        // 3. Cek apakah ada antrean perintah untuk device ini
-        const checkCmdQuery = 'SELECT id, command_name, command_value FROM commands WHERE chamber_id = ? ORDER BY id ASC';
-        db.query(checkCmdQuery, [device], (err3, cmds) => {
-            if (err3 || cmds.length === 0) {
-                // Tidak ada perintah
-                return res.json({ status: "berhasil", pesan: "Data tersimpan", commands: [] });
-            }
+        // 3. Pengecekan Jadwal Otomatis Serverless Real-time sebelum mengambil antrean perintah
+        checkAndExecuteSchedules(db, device, () => {
+            const checkCmdQuery = 'SELECT id, command_name, command_value FROM commands WHERE chamber_id = ? ORDER BY id ASC';
+            db.query(checkCmdQuery, [device], (err3, cmds) => {
+                if (err3 || cmds.length === 0) {
+                    return res.json({ status: "berhasil", pesan: "Data tersimpan", commands: [] });
+                }
 
-            // Jika ada perintah, hapus dari tabel lalu kirim ke ESP
-            const cmdIds = cmds.map(c => c.id);
-            const deleteCmdQuery = 'DELETE FROM commands WHERE id IN (?)';
-            db.query(deleteCmdQuery, [cmdIds], () => {
-                console.log(`[🚀] Mengirim ${cmds.length} perintah ke ${device}`);
-                return res.json({ 
-                    status: "berhasil", 
-                    pesan: "Data tersimpan, mengirim instruksi", 
-                    commands: cmds 
+                const cmdIds = cmds.map(c => c.id);
+                const deleteCmdQuery = 'DELETE FROM commands WHERE id IN (?)';
+                db.query(deleteCmdQuery, [cmdIds], () => {
+                    console.log(`[🚀] Mengirim ${cmds.length} perintah ke ${device}`);
+                    return res.json({ 
+                        status: "berhasil", 
+                        pesan: "Data tersimpan, mengirim perintah", 
+                        commands: cmds 
+                    });
                 });
             });
         });
     });
 });
+
+// Helper Pengecekan Jadwal Otomatis Serverless Real-Time (WIB Asia/Jakarta)
+function checkAndExecuteSchedules(db, device, callback) {
+    try {
+        const options = { timeZone: 'Asia/Jakarta', hour12: false, hour: '2-digit', minute: '2-digit' };
+        const dateOptions = { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' };
+        const timeFormatter = new Intl.DateTimeFormat('en-US', options);
+        const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
+        
+        const currentHHMM = timeFormatter.format(new Date()).replace(/24:/, '00:');
+        const dateParts = dateFormatter.formatToParts(new Date());
+        const year = dateParts.find(p => p.type === 'year').value;
+        const month = dateParts.find(p => p.type === 'month').value;
+        const day = dateParts.find(p => p.type === 'day').value;
+        const currentDateStr = `${year}-${month}-${day}`;
+
+        const checkQuery = `SELECT * FROM schedules WHERE chamber_id = ? AND scheduled_time = ? AND (last_executed != ? OR last_executed IS NULL)`;
+        db.query(checkQuery, [device, currentHHMM, currentDateStr], (err, results) => {
+            if (err || !results || results.length === 0) {
+                return callback();
+            }
+            let pending = results.length;
+            results.forEach(schedule => {
+                const insertCmd = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES (?, ?, ?)';
+                db.query(insertCmd, [schedule.chamber_id, schedule.command_name, schedule.command_value], (err2) => {
+                    if (!err2) {
+                        db.query("UPDATE schedules SET last_executed = ? WHERE id = ?", [currentDateStr, schedule.id]);
+                        console.log(`[⏰ OTOMATIS LIVE] Menjalankan ${schedule.command_name} ${schedule.command_value} untuk ${schedule.chamber_id} pada WIB ${currentHHMM}`);
+                    }
+                    pending--;
+                    if (pending <= 0) callback();
+                });
+            });
+        });
+    } catch(e) {
+        callback();
+    }
+}
 
 // ==========================================
 // 3A. GET /api/data/latest (Ambil Data Terbaru Secara Umum)
