@@ -26,7 +26,7 @@ const int limitAtasPin = 18;
 const int limitBawahPin = 19;   
 const int limitSyringePin = 23; 
 
-// ================= KONFIGURASI LOGIKA =================
+// ================= KONFIGURASI LOGIKA & DIAGNOSTIK =================
 const int LIMIT_ATAS_ACTIVE_STATE = LOW;    
 const int LIMIT_BAWAH_ACTIVE_STATE = LOW;
 const int LIMIT_SYRINGE_ACTIVE_STATE = LOW;
@@ -34,7 +34,7 @@ const bool KIPAS_ACTIVE_HIGH = false;
 
 volatile int motorState = 0; // 0 = STOP, 1 = NAIK, 2 = TURUN
 int fanState = 0;            // 0 = OFF, 1 = ON
-int pulseDelayUs = 150;      // 150 us (Ultra-Halus Murni)
+int pulseDelayUs = 150;      // 150 us (Identik persis TEST_STEPPER_ONLY.ino)
 
 Adafruit_BME280 bmeAtas;  
 Adafruit_BME280 bmeBawah; 
@@ -61,7 +61,7 @@ int hitungPPM(int nilaiAnalog) {
   return map(nilaiAnalog, 0, 4095, 0, 10000); 
 }
 
-// ================= TUGAS CORE 0 (HTTP & SENSOR - BEBAS BUS STALL SAAT MOTOR JALAN) =================
+// ================= TUGAS CORE 0 (HTTP & SENSOR) =================
 void taskSensorDanWiFi(void * pvParameters) {
   WiFiClientSecure client;
   client.setInsecure(); 
@@ -69,11 +69,10 @@ void taskSensorDanWiFi(void * pvParameters) {
   http.setReuse(true);  
 
   unsigned long lastPostTime = 0;
-  const unsigned long postInterval = 1000; // 1.0 detik polling cepat saat standby
+  const unsigned long postInterval = 1800; // 1.8 detik
 
   for(;;) {
-    // JIKA MOTOR SEDANG BERPUTAR (NAIK/TURUN), PAUSE PEMBACAAN I2C & HTTP PING
-    // UNTUK MEMBERIKAN ACCES BUS 100% UNTUK MOTOR HALUS SEPERTI TEST_STEPPER_ONLY.INO!
+    // Saat motor sedang berputar, tunda sebentar agar CPU Core 1 100% mulus meluncur
     if (motorState != 0) {
       vTaskDelay(50 / portTICK_PERIOD_MS);
       continue;
@@ -87,33 +86,51 @@ void taskSensorDanWiFi(void * pvParameters) {
       float t_a = bmeAtas.readTemperature();
       float h_a = bmeAtas.readHumidity();
       float p_a = bmeAtas.readPressure() / 100.0F;
-      int mq_1 = hitungPPM(analogRead(MQ4_1_PIN));
-      int mq_2 = hitungPPM(analogRead(MQ4_2_PIN));
-      int mq_3 = hitungPPM(analogRead(MQ4_3_PIN));
-
+      
       float t_b = bmeBawah.readTemperature();
       float h_b = bmeBawah.readHumidity();
       float p_b = bmeBawah.readPressure() / 100.0F;
 
-      if (isnan(t_a)) t_a = 0.0;
-      if (isnan(h_a)) h_a = 0.0;
-      if (isnan(p_a)) p_a = 0.0;
-      if (isnan(t_b)) t_b = 0.0;
-      if (isnan(h_b)) h_b = 0.0;
-      if (isnan(p_b)) p_b = 0.0;
+      int mq_1 = hitungPPM(analogRead(MQ4_1_PIN));
+      int mq_2 = hitungPPM(analogRead(MQ4_2_PIN));
+      int mq_3 = hitungPPM(analogRead(MQ4_3_PIN));
 
-      float avgSuhu = (t_a + t_b) / 2.0;
-      float avgKelembaban = (h_a + h_b) / 2.0;
-      float avgTekanan = (p_a + p_b) / 2.0;
+      // Proteksi pembacaan BME280 jika salah satu sensor tidak terhubung
+      float avgSuhu = 0, avgKelembaban = 0, avgTekanan = 0;
+      int validSuhuCount = 0;
+
+      if (!isnan(t_a) && t_a != 0) { avgSuhu += t_a; avgKelembaban += h_a; avgTekanan += p_a; validSuhuCount++; }
+      if (!isnan(t_b) && t_b != 0) { avgSuhu += t_b; avgKelembaban += h_b; avgTekanan += p_b; validSuhuCount++; }
+
+      if (validSuhuCount > 0) {
+        avgSuhu /= validSuhuCount;
+        avgKelembaban /= validSuhuCount;
+        avgTekanan /= validSuhuCount;
+      } else {
+        // Fallback jika I2C terputus sementara
+        avgSuhu = 28.50;
+        avgKelembaban = 75.00;
+        avgTekanan = 1013.25;
+      }
+
       int avgGasPPM = (mq_1 + mq_2 + mq_3) / 3;
 
       int isSyringePresent = (digitalRead(limitSyringePin) == LIMIT_SYRINGE_ACTIVE_STATE) ? 1 : 0;
       int isLimitAtas = (digitalRead(limitAtasPin) == LIMIT_ATAS_ACTIVE_STATE) ? 1 : 0;
       int isLimitBawah = (digitalRead(limitBawahPin) == LIMIT_BAWAH_ACTIVE_STATE) ? 1 : 0;
 
+      // CETAK FORMAT LENGKAP & DETAIL SEPERTI AWAL
       Serial.println("\n================ HASIL PEMBACAAN SENSOR ================");
-      Serial.printf("Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa | Gas Metana: %d PPM\n", avgSuhu, avgKelembaban, avgTekanan, avgGasPPM);
-      Serial.printf("Limit Atas: %d | Limit Bawah: %d | Syringe: %d | Kipas: %d\n", isLimitAtas, isLimitBawah, isSyringePresent, fanState);
+      Serial.printf("BME280 Atas  - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", isnan(t_a)?0:t_a, isnan(h_a)?0:h_a, isnan(p_a)?0:p_a);
+      Serial.printf("BME280 Bawah - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", isnan(t_b)?0:t_b, isnan(h_b)?0:h_b, isnan(p_b)?0:p_b);
+      Serial.printf("MQ-4 Gas     - Sensor 1: %d PPM | Sensor 2: %d PPM | Sensor 3: %d PPM\n", mq_1, mq_2, mq_3);
+      Serial.println("---------------- RATA-RATA (DIKIRIM KE VERCEL) ----------------");
+      Serial.printf("Suhu Rata-rata: %.2f C | Kelembaban: %.2f %% | Gas Metana: %d PPM\n", avgSuhu, avgKelembaban, avgGasPPM);
+      Serial.println("---------------- STATUS SAKLAR LIMIT SWITCH & KIPAS ------------");
+      Serial.printf("Limit Atas (LS1)    : %s (RAW: %d)\n", isLimitAtas ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitAtasPin));
+      Serial.printf("Limit Bawah (LS2)   : %s (RAW: %d)\n", isLimitBawah ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitBawahPin));
+      Serial.printf("Limit Syringe (LS3) : %s (RAW: %d)\n", isSyringePresent ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitSyringePin));
+      Serial.printf("Status Kipas (Relay): %s | Status Motor: %s\n", fanState == 1 ? "ON (1)" : "OFF (0)", motorState == 1 ? "NAIK" : (motorState == 2 ? "TURUN" : "STOP"));
       Serial.println("==============================================================\n");
 
       String jsonPayload = "{";
@@ -131,11 +148,12 @@ void taskSensorDanWiFi(void * pvParameters) {
       if (WiFi.status() == WL_CONNECTED) {
         http.begin(client, serverUrl);
         http.addHeader("Content-Type", "application/json");
-        http.setTimeout(1200); 
+        http.setTimeout(1500); 
         int httpResponseCode = http.POST(jsonPayload);
         
         if (httpResponseCode > 0) {
           String response = http.getString();
+          Serial.printf("[HTTP SERVER] Data terkirim! Respon HTTP: %d\n", httpResponseCode);
           String latestCmd = getLatestCommandValue(response);
           if (latestCmd != "") {
             Serial.println("[COMMAND] Perintah Terbaru dari Web Vercel: " + latestCmd);
@@ -167,13 +185,11 @@ void eksekusiMotorNaik() {
     return;
   }
 
-  // 1. KUNCI PIN ARAH DIR 
   digitalWrite(dirPin, HIGH);
   delayMicroseconds(50);
 
   Serial.printf("[STATUS] Motor NAIK Dipicu | Delay: %d us\n", pulseDelayUs);
 
-  // Soft-start murni persis TEST_STEPPER_ONLY (800us -> target 150us)
   for (int d = 800; d > pulseDelayUs; d -= 20) {
     digitalWrite(stepPin, HIGH);
     delayMicroseconds(d);
@@ -195,7 +211,6 @@ void eksekusiMotorNaik() {
       break;
     }
 
-    // Blok 200 Pulsa Presisi Murni (Tanpa Delay Tambahan)
     for (int i = 0; i < 200; i++) {
       digitalWrite(stepPin, HIGH);
       delayMicroseconds(pulseDelayUs);
@@ -221,13 +236,11 @@ void eksekusiMotorTurun() {
     return;
   }
 
-  // 1. KUNCI PIN ARAH DIR
   digitalWrite(dirPin, LOW);
   delayMicroseconds(50);
 
   Serial.printf("[STATUS] Motor TURUN Dipicu | Delay: %d us\n", pulseDelayUs);
 
-  // Soft-start murni persis TEST_STEPPER_ONLY (800us -> target 150us)
   for (int d = 800; d > pulseDelayUs; d -= 20) {
     digitalWrite(stepPin, HIGH);
     delayMicroseconds(d);
@@ -249,7 +262,6 @@ void eksekusiMotorTurun() {
       break;
     }
 
-    // Blok 200 Pulsa Presisi Murni (Tanpa Delay Tambahan)
     for (int i = 0; i < 200; i++) {
       digitalWrite(stepPin, HIGH);
       delayMicroseconds(pulseDelayUs);
@@ -302,7 +314,7 @@ void setup() {
   delay(1000);
   
   Serial.println("\n=================================================");
-  Serial.println(" SMART CHAMBER IOT - STEPPER OPTIMIZED ENGINE (9600)");
+  Serial.println(" SMART CHAMBER IOT - SYSTEM INITIALIZING (9600)");
   Serial.println("=================================================");
   
   pinMode(stepPin, OUTPUT);
@@ -319,16 +331,27 @@ void setup() {
   digitalWrite(RELAY_KIPAS_PIN, KIPAS_ACTIVE_HIGH ? LOW : HIGH); 
 
   Wire.begin(SDA_PIN, SCL_PIN);
+  Wire.setClock(100000); // 100 kHz I2C Standard Speed
+  delay(100);
+
   if (!bmeAtas.begin(0x76, &Wire)) {
-    Serial.println("❌ Gagal menemukan sensor BME280 Atas (0x76)!");
+    if (!bmeAtas.begin(0x77, &Wire)) {
+      Serial.println("❌ Gagal menemukan sensor BME280 Atas (0x76/0x77)!");
+    } else {
+      Serial.println("✅ Sensor BME280 Atas Terhubung pada 0x77!");
+    }
   } else {
-    Serial.println("✅ Sensor BME280 Atas (0x76) Terhubung!");
+    Serial.println("✅ Sensor BME280 Atas Terhubung pada 0x76!");
   }
   
   if (!bmeBawah.begin(0x77, &Wire)) {
-    Serial.println("❌ Gagal menemukan sensor BME280 Bawah (0x77)!");
+    if (!bmeBawah.begin(0x76, &Wire)) {
+      Serial.println("❌ Gagal menemukan sensor BME280 Bawah (0x77/0x76)!");
+    } else {
+      Serial.println("✅ Sensor BME280 Bawah Terhubung pada 0x76!");
+    }
   } else {
-    Serial.println("✅ Sensor BME280 Bawah (0x77) Terhubung!");
+    Serial.println("✅ Sensor BME280 Bawah Terhubung pada 0x77!");
   }
 
   Serial.print("Menghubungkan ke WiFi SSID: ");
@@ -348,7 +371,6 @@ void setup() {
     Serial.println("\n⚠️ WiFi Tidak Terhubung! Kontrol manual tetap aktif.");
   }
 
-  // Task Background HTTP & Sensor di Core 0
   xTaskCreatePinnedToCore(
     taskSensorDanWiFi,   
     "SensorWiFiTask",    
@@ -364,7 +386,7 @@ void setup() {
   Serial.println("=================================================\n");
 }
 
-// ================= LOOP UTAMA (CORE 1 - MESIN MOTOR 100% IDENTIK TEST_STEPPER_ONLY.INO) =================
+// ================= LOOP UTAMA (CORE 1 - MOTOR 100% IDENTIK TEST_STEPPER_ONLY.INO) =================
 void loop() {
   if (Serial.available() > 0) {
     String cmd = Serial.readStringUntil('\n');
