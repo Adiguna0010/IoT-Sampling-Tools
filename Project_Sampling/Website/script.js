@@ -724,9 +724,23 @@ async function moveSyringe(chamberId, direction) {
     const safeId = chamberId.replace(/\s+/g, '-');
     const presenceBadge = document.getElementById(`syringe-presence-${safeId}`) ? document.getElementById(`syringe-presence-${safeId}`).innerText : "Kosong";
     if (presenceBadge === "Kosong" || presenceBadge === "Cek") {
-        alert("ERROR: Tidak ada syringe terdeteksi di alat!");
+        alert("⚠️ PERINGATAN: Tidak ada syringe terdeteksi di alat (LS3 Terlepas)!");
         return;
     }
+
+    // Proteksi Limit Switch di Web UI: Tolak jika sudah menabrak batas
+    const posBadgeEl = document.getElementById(`syringe-badge-${safeId}`) || document.getElementById(`detail-syringe-status`);
+    const posText = posBadgeEl ? posBadgeEl.innerText.toLowerCase() : "";
+
+    if (direction === 'D' && (posText.includes("bawah") || posText.includes("tutup"))) {
+        alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling BAWAH (Limit Bawah Aktif)! Perintah Turun Ditolak.");
+        return;
+    }
+    if (direction === 'U' && (posText.includes("atas") || posText.includes("buka"))) {
+        alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling ATAS (Limit Atas Aktif)! Perintah Naik Ditolak.");
+        return;
+    }
+
     try {
         const payload = [{ chamber_id: chamberId, command_name: "Syringe", command_value: direction }];
         const res = await fetch('http://localhost:3000/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });

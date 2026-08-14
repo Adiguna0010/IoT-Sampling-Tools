@@ -1,33 +1,84 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
 // ================= KONFIGURASI WIFI & SERVER =================
-const char* ssid = "1234";
-const char* password = "12345678";
-const char* serverUrl = "http://10.5.27.116:3000/api/data"; 
+const char* ssid = "ChamberBase";
+const char* password = "chamber123";
+const char* serverUrl = "https://iot-chamber-backend.vercel.app/api/data"; 
 
 // ================= KONFIGURASI PIN =================
 #define SDA_PIN           21
 #define SCL_PIN           22
-#define MQ4_1_PIN         34  
-#define MQ4_2_PIN         35  
-#define RELAY_KIPAS_PIN   25  
 
-const int dirPin = 26;   
-const int stepPin = 27;  
-const int limitAtasPin = 32;    
-const int limitBawahPin = 33;   
-const int limitSyringePin = 4;  
+#define MQ4_1_PIN         32  
+#define MQ4_2_PIN         33  
+#define MQ4_3_PIN         34  
+
+#define RELAY_KIPAS_PIN   4  
+
+const int dirPin = 14;   
+const int stepPin = 13;  
+const int limitAtasPin = 18;    
+const int limitBawahPin = 19;   
+const int limitSyringePin = 23; 
+
+// ================= KONFIGURASI LOGIKA & DIAGNOSTIK =================
+const int LIMIT_ATAS_ACTIVE_STATE = LOW;    
+const int LIMIT_BAWAH_ACTIVE_STATE = LOW;
+const int LIMIT_SYRINGE_ACTIVE_STATE = LOW;
+const bool KIPAS_ACTIVE_HIGH = false;        
+
+int lastAtasState = -1;
+int lastBawahState = -1;
+int lastSyringeState = -1;
+
+int pulseDelayUs = 150; // Kecepatan Stepper Cepat & Super Halus (150 us)
+
+// Helper presisi: Mengambil HANYA 1 PERINTAH TERAKHIR dari respon Vercel (Mencegah Motor Kagok/Kebingungan)
+String getLatestCommandValue(String resp) {
+  int idx = resp.lastIndexOf("\"command_value\"");
+  if (idx == -1) return "";
+  int valStart = resp.indexOf(":", idx);
+  if (valStart == -1) return "";
+  int quote1 = resp.indexOf("\"", valStart);
+  if (quote1 == -1) return "";
+  int quote2 = resp.indexOf("\"", quote1 + 1);
+  if (quote2 == -1) return "";
+  return resp.substring(quote1 + 1, quote2);
+}
+
+void checkLimitSwitchStatusChanges() {
+  int currentAtas = digitalRead(limitAtasPin);
+  int currentBawah = digitalRead(limitBawahPin);
+  int currentSyringe = digitalRead(limitSyringePin);
+  
+  if (currentAtas != lastAtasState) {
+    Serial.printf("[DIAGNOSTIC] Limit Atas (Pin %d) berubah: %s (RAW: %d)\n", 
+                  limitAtasPin, currentAtas == LIMIT_ATAS_ACTIVE_STATE ? "TERTEKAN (ACTIVE)" : "TERLEPAS (INACTIVE)", currentAtas);
+    lastAtasState = currentAtas;
+  }
+  if (currentBawah != lastBawahState) {
+    Serial.printf("[DIAGNOSTIC] Limit Bawah (Pin %d) berubah: %s (RAW: %d)\n", 
+                  limitBawahPin, currentBawah == LIMIT_BAWAH_ACTIVE_STATE ? "TERTEKAN (ACTIVE)" : "TERLEPAS (INACTIVE)", currentBawah);
+    lastBawahState = currentBawah;
+  }
+  if (currentSyringe != lastSyringeState) {
+    Serial.printf("[DIAGNOSTIC] Limit Syringe (Pin %d) berubah: %s (RAW: %d)\n", 
+                  limitSyringePin, currentSyringe == LIMIT_SYRINGE_ACTIVE_STATE ? "TERTEKAN (ACTIVE)" : "TERLEPAS (INACTIVE)", currentSyringe);
+    lastSyringeState = currentSyringe;
+  }
+}
 
 // ================= VARIABEL GLOBAL =================
 Adafruit_BME280 bmeAtas;  
 Adafruit_BME280 bmeBawah; 
 
 String command = "";
-int motorState = 0; 
+int motorState = 0; // 0 = STOP, 1 = NAIK, 2 = TURUN
 int fanState = 0;   
 
 TaskHandle_t TaskSensorWiFi; 
@@ -42,91 +93,103 @@ bool bacaSensorStabil(int pin, int targetState) {
   return (hitunganBenar >= 4); 
 }
 
-// ================= FUNGSI KONVERSI MQ-4 KE PPM (SIMPEL) =================
 int hitungPPM(int nilaiAnalog) {
   return map(nilaiAnalog, 0, 4095, 0, 10000); 
 }
 
-// ================= TUGAS CORE 0 (SENSOR & WIFI) =================
+// ================= TUGAS CORE 0 (PERSISTENT SSL CLIENT & EKSEKUSI PERINTAH TUNGGAL) =================
 void taskSensorDanWiFi(void * pvParameters) {
+  WiFiClientSecure client;
+  client.setInsecure(); 
+  HTTPClient http;
+  http.setReuse(true);  
+
+  unsigned long lastPostTime = 0;
+  const unsigned long postInterval = 2000; // 2.0 detik
+
   for(;;) {
-    // PERUBAHAN: Jeda diubah menjadi 3 detik (3000 ms)
-    vTaskDelay(3000 / portTICK_PERIOD_MS); 
+    unsigned long currentMillis = millis();
 
-    // --- PENGAMBILAN SAMPLE 1 ---
-    float t1_a = bmeAtas.readTemperature();
-    float h1_a = bmeAtas.readHumidity();
-    float p1_a = bmeAtas.readPressure() / 100.0F;
-    int mq1_a_ppm = hitungPPM(analogRead(MQ4_1_PIN));
+    if (currentMillis - lastPostTime >= postInterval) {
+      lastPostTime = currentMillis;
 
-    float t1_b = bmeBawah.readTemperature();
-    float h1_b = bmeBawah.readHumidity();
-    float p1_b = bmeBawah.readPressure() / 100.0F;
-    int mq1_b_ppm = hitungPPM(analogRead(MQ4_2_PIN));
+      float t_a = bmeAtas.readTemperature();
+      float h_a = bmeAtas.readHumidity();
+      float p_a = bmeAtas.readPressure() / 100.0F;
+      int mq_1 = hitungPPM(analogRead(MQ4_1_PIN));
+      int mq_2 = hitungPPM(analogRead(MQ4_2_PIN));
+      int mq_3 = hitungPPM(analogRead(MQ4_3_PIN));
 
-    vTaskDelay(2000 / portTICK_PERIOD_MS); // Jeda 2 detik antar sample
+      float t_b = bmeBawah.readTemperature();
+      float h_b = bmeBawah.readHumidity();
+      float p_b = bmeBawah.readPressure() / 100.0F;
 
-    // --- PENGAMBILAN SAMPLE 2 ---
-    float t2_a = bmeAtas.readTemperature();
-    float h2_a = bmeAtas.readHumidity();
-    float p2_a = bmeAtas.readPressure() / 100.0F;
-    int mq2_a_ppm = hitungPPM(analogRead(MQ4_1_PIN));
+      if (isnan(t_a)) t_a = 0.0;
+      if (isnan(h_a)) h_a = 0.0;
+      if (isnan(p_a)) p_a = 0.0;
+      if (isnan(t_b)) t_b = 0.0;
+      if (isnan(h_b)) h_b = 0.0;
+      if (isnan(p_b)) p_b = 0.0;
 
-    float t2_b = bmeBawah.readTemperature();
-    float h2_b = bmeBawah.readHumidity();
-    float p2_b = bmeBawah.readPressure() / 100.0F;
-    int mq2_b_ppm = hitungPPM(analogRead(MQ4_2_PIN));
+      float avgSuhu = (t_a + t_b) / 2.0;
+      float avgKelembaban = (h_a + h_b) / 2.0;
+      float avgTekanan = (p_a + p_b) / 2.0;
+      int avgGasPPM = (mq_1 + mq_2 + mq_3) / 3;
 
-    // --- KALKULASI RATA-RATA ---
-    float avgSuhu = (t1_a + t1_b + t2_a + t2_b) / 4.0;
-    float avgKelembaban = (h1_a + h1_b + h2_a + h2_b) / 4.0;
-    float avgTekanan = (p1_a + p1_b + p2_a + p2_b) / 4.0;
-    int avgGasPPM = (mq1_a_ppm + mq1_b_ppm + mq2_a_ppm + mq2_b_ppm) / 4;
-    int isSyringePresent = bacaSensorStabil(limitSyringePin, LOW) ? 1 : 0;
+      int isSyringePresent = bacaSensorStabil(limitSyringePin, LIMIT_SYRINGE_ACTIVE_STATE) ? 1 : 0;
+      int isLimitAtas = bacaSensorStabil(limitAtasPin, LIMIT_ATAS_ACTIVE_STATE) ? 1 : 0;
+      int isLimitBawah = bacaSensorStabil(limitBawahPin, LIMIT_BAWAH_ACTIVE_STATE) ? 1 : 0;
 
-    // --- TAMPILKAN KE SERIAL MONITOR ---
-    Serial.println("\n=== HASIL PEMBACAAN SENSOR ===");
-    Serial.printf("BME280 Atas  - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t2_a, h2_a, p2_a);
-    Serial.printf("BME280 Bawah - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t2_b, h2_b, p2_b);
-    Serial.printf("MQ-4 Atas    : %d PPM | MQ-4 Bawah : %d PPM\n", mq2_a_ppm, mq2_b_ppm);
-    Serial.println("--- NILAI AVERAGE (DIKIRIM KE SERVER) ---");
-    Serial.printf("Suhu: %.2f | Kelembaban: %.2f | Tekanan: %.2f | Gas: %d PPM\n", avgSuhu, avgKelembaban, avgTekanan, avgGasPPM);
-    Serial.println("================================\n");
+      Serial.println("\n================ HASIL PEMBACAAN SENSOR ================");
+      Serial.printf("BME280 Atas  - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t_a, h_a, p_a);
+      Serial.printf("BME280 Bawah - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t_b, h_b, p_b);
+      Serial.printf("MQ-4 Gas     - Sensor 1: %d PPM | Sensor 2: %d PPM | Sensor 3: %d PPM\n", mq_1, mq_2, mq_3);
+      Serial.println("---------------- RATA-RATA (DIKIRIM KE VERCEL) ----------------");
+      Serial.printf("Suhu Rata-rata: %.2f C | Kelembaban: %.2f %% | Gas Metana: %d PPM\n", avgSuhu, avgKelembaban, avgGasPPM);
+      Serial.println("---------------- STATUS SAKLAR LIMIT SWITCH ------------------");
+      Serial.printf("Limit Atas (LS1)    : %s (RAW: %d)\n", isLimitAtas ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitAtasPin));
+      Serial.printf("Limit Bawah (LS2)   : %s (RAW: %d)\n", isLimitBawah ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitBawahPin));
+      Serial.printf("Limit Syringe (LS3) : %s (RAW: %d)\n", isSyringePresent ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitSyringePin));
+      Serial.println("==============================================================\n");
 
-    // --- FORMAT JSON ---
-    String jsonPayload = "{";
-    jsonPayload += "\"device\": \"Chamber 1\", ";
-    jsonPayload += "\"suhu\": " + String(avgSuhu, 2) + ", ";
-    jsonPayload += "\"kelembaban\": " + String(avgKelembaban, 2) + ", ";
-    jsonPayload += "\"tekanan\": " + String(avgTekanan, 2) + ", ";
-    jsonPayload += "\"gas_metana\": " + String(avgGasPPM) + ", "; 
-    jsonPayload += "\"syringe_present\": " + String(isSyringePresent);
-    jsonPayload += "}";
+      String jsonPayload = "{";
+      jsonPayload += "\"device\": \"Chamber 1\", ";
+      jsonPayload += "\"suhu\": " + String(avgSuhu, 2) + ", ";
+      jsonPayload += "\"kelembaban\": " + String(avgKelembaban, 2) + ", ";
+      jsonPayload += "\"tekanan\": " + String(avgTekanan, 2) + ", ";
+      jsonPayload += "\"gas_metana\": " + String(avgGasPPM) + ", "; 
+      jsonPayload += "\"syringe_present\": " + String(isSyringePresent) + ", ";
+      jsonPayload += "\"limit_atas\": " + String(isLimitAtas) + ", ";
+      jsonPayload += "\"limit_bawah\": " + String(isLimitBawah);
+      jsonPayload += "}";
 
-    // --- KIRIM HTTP POST JIKA WIFI TERHUBUNG ---
-    if (WiFi.status() == WL_CONNECTED) {
-      HTTPClient http;
-      http.begin(serverUrl);
-      http.addHeader("Content-Type", "application/json");
-      int httpResponseCode = http.POST(jsonPayload);
-      
-      if (httpResponseCode > 0) {
-        String response = http.getString();
-        Serial.printf("Data terkirim! HTTP: %d\n", httpResponseCode);
+      if (WiFi.status() == WL_CONNECTED) {
+        http.begin(client, serverUrl);
+        http.addHeader("Content-Type", "application/json");
+        http.setTimeout(2000); 
+        int httpResponseCode = http.POST(jsonPayload);
         
-        // Membaca perintah dari server 
-        if (response.indexOf("\"command_value\":\"1\"") > 0) prosesPerintah("1");
-        if (response.indexOf("\"command_value\":\"0\"") > 0) prosesPerintah("0");
-        if (response.indexOf("\"command_value\":\"U\"") > 0) prosesPerintah("U");
-        if (response.indexOf("\"command_value\":\"D\"") > 0) prosesPerintah("D");
-        if (response.indexOf("\"command_value\":\"S\"") > 0) prosesPerintah("S");
+        if (httpResponseCode > 0) {
+          String response = http.getString();
+          Serial.printf("[HTTP SERVER] Data terkirim! Respon HTTP: %d\n", httpResponseCode);
+          
+          // Mengambil HANYA 1 Perintah Terbaru untuk Mencegah Motor Kagok
+          String latestCmd = getLatestCommandValue(response);
+          if (latestCmd != "") {
+            Serial.println("[COMMAND] Perintah Tunggal Terbaru Diterima: " + latestCmd);
+            prosesPerintah(latestCmd);
+          }
+        } else {
+          Serial.printf("[HTTP NOTICE] Vercel Server sibuk (Code: %d), mencoba ulang...\n", httpResponseCode);
+        }
+        http.end();
       } else {
-        Serial.printf("Gagal mengirim data. Error: %s\n", http.errorToString(httpResponseCode).c_str());
+        Serial.println("[WIFI ALERT] WiFi Terputus! Reconnecting...");
+        WiFi.reconnect();
       }
-      http.end();
-    } else {
-      Serial.println("WiFi terputus! Gagal mengirim data.");
     }
+
+    vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
 
@@ -135,69 +198,112 @@ void prosesPerintah(String cmd) {
   cmd.trim();
   cmd.toUpperCase();
   
-  bool syringeTerpasang = bacaSensorStabil(limitSyringePin, LOW);
+  bool syringeTerpasang = bacaSensorStabil(limitSyringePin, LIMIT_SYRINGE_ACTIVE_STATE);
 
   if (cmd == "1") {
-    digitalWrite(RELAY_KIPAS_PIN, LOW); // LOW = Magnet Aktif = Kipas ON
+    digitalWrite(RELAY_KIPAS_PIN, KIPAS_ACTIVE_HIGH ? HIGH : LOW);
     fanState = 1;
-    Serial.println("Status: Kipas ON");
+    Serial.println("STATUS BARU: Kipas ON");
   } else if (cmd == "0") {
-    digitalWrite(RELAY_KIPAS_PIN, HIGH); // HIGH = Magnet Lepas = Kipas OFF
+    digitalWrite(RELAY_KIPAS_PIN, KIPAS_ACTIVE_HIGH ? LOW : HIGH);
     fanState = 0;
-    Serial.println("Status: Kipas OFF");
+    Serial.println("STATUS BARU: Kipas OFF");
   } else if (!syringeTerpasang && (cmd == "U" || cmd == "D")) {
-    Serial.println("PROSES DITOLAK: Syringe belum terpasang!");
+    Serial.println("PROSES DITOLAK: Syringe belum terpasang (LS3 Terlepas)!");
   } else if (cmd == "U") {
-    if (!bacaSensorStabil(limitAtasPin, LOW)) { 
-      motorState = 1;
+    if (!bacaSensorStabil(limitAtasPin, LIMIT_ATAS_ACTIVE_STATE)) { 
       digitalWrite(dirPin, HIGH);
-      Serial.println("Status: Motor NAIK (Up)");
+      
+      for (int d = 600; d > pulseDelayUs; d -= 25) {
+        digitalWrite(stepPin, HIGH);
+        delayMicroseconds(d);
+        digitalWrite(stepPin, LOW);
+        delayMicroseconds(d);
+      }
+      
+      motorState = 1;
+      Serial.println("STATUS BARU: Motor NAIK (Up)");
+    } else {
+      motorState = 0;
+      digitalWrite(stepPin, LOW);
+      Serial.println("GERAK NAIK DITOLAK: Limit Atas terdeteksi!");
     }
   } else if (cmd == "D") {
-    if (!bacaSensorStabil(limitBawahPin, LOW)) { 
-      motorState = 2;
+    if (!bacaSensorStabil(limitBawahPin, LIMIT_BAWAH_ACTIVE_STATE)) { 
       digitalWrite(dirPin, LOW);
-      Serial.println("Status: Motor TURUN (Down)");
+
+      for (int d = 600; d > pulseDelayUs; d -= 25) {
+        digitalWrite(stepPin, HIGH);
+        delayMicroseconds(d);
+        digitalWrite(stepPin, LOW);
+        delayMicroseconds(d);
+      }
+
+      motorState = 2;
+      Serial.println("STATUS BARU: Motor TURUN (Down)");
+    } else {
+      motorState = 0;
+      digitalWrite(stepPin, LOW);
+      Serial.println("GERAK TURUN DITOLAK: Limit Bawah terdeteksi!");
     }
   } else if (cmd == "S" || cmd == "STOP") {
     motorState = 0;
-    Serial.println("Status: Motor BERHENTI");
+    digitalWrite(stepPin, LOW);
+    Serial.println("STATUS BARU: Motor BERHENTI");
   }
 }
 
 // ================= SETUP UTAMA =================
 void setup() {
   Serial.begin(9600);
+  delay(1000);
   
-  // Inisialisasi Pin
+  Serial.println("\n=================================================");
+  Serial.println("   SMART CHAMBER IOT - SYSTEM INITIALIZING (9600)");
+  Serial.println("=================================================");
+  
   pinMode(dirPin, OUTPUT);
   pinMode(stepPin, OUTPUT);
   pinMode(limitAtasPin, INPUT_PULLUP);
   pinMode(limitBawahPin, INPUT_PULLUP);
   pinMode(limitSyringePin, INPUT_PULLUP);
   
-  pinMode(RELAY_KIPAS_PIN, OUTPUT);
-  digitalWrite(RELAY_KIPAS_PIN, HIGH); // HIGH membuat kipas MATI saat pertama colok listrik
+  digitalWrite(stepPin, LOW);
+  digitalWrite(dirPin, LOW);
 
-  // Inisialisasi I2C dan Sensor BME280
+  pinMode(RELAY_KIPAS_PIN, OUTPUT);
+  digitalWrite(RELAY_KIPAS_PIN, KIPAS_ACTIVE_HIGH ? LOW : HIGH); 
+
   Wire.begin(SDA_PIN, SCL_PIN);
   if (!bmeAtas.begin(0x76, &Wire)) {
-    Serial.println("Gagal menemukan sensor BME280 Atas (0x76)!");
+    Serial.println("❌ Gagal menemukan sensor BME280 Atas (0x76)!");
+  } else {
+    Serial.println("✅ Sensor BME280 Atas (0x76) Terhubung!");
   }
+  
   if (!bmeBawah.begin(0x77, &Wire)) {
-    Serial.println("Gagal menemukan sensor BME280 Bawah (0x77)!");
+    Serial.println("❌ Gagal menemukan sensor BME280 Bawah (0x77)!");
+  } else {
+    Serial.println("✅ Sensor BME280 Bawah (0x77) Terhubung!");
   }
 
-  // Koneksi WiFi
-  Serial.print("Menghubungkan ke WiFi...");
+  Serial.print("Menghubungkan ke WiFi SSID: ");
+  Serial.println(ssid);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+
+  int wifiTimeout = 0;
+  while (WiFi.status() != WL_CONNECTED && wifiTimeout < 20) {
     delay(500);
     Serial.print(".");
+    wifiTimeout++;
   }
-  Serial.println("\nWiFi Terhubung! IP: " + WiFi.localIP().toString());
 
-  // Membuat Tugas di Core 0 
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Terhubung! IP ESP32: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\n⚠️ WiFi Tidak Terhubung! Sistem akan tetap menjalankan kontrol manual.");
+  }
+
   xTaskCreatePinnedToCore(
     taskSensorDanWiFi,   
     "SensorWiFiTask",    
@@ -208,9 +314,9 @@ void setup() {
     0                    
   );
 
-  Serial.println("\nSistem Siap! (Dual-Core Aktif)");
-  Serial.println("Perintah: 'U' (Naik), 'D' (Turun), 'S' (Stop)");
-  Serial.println("Kipas   : '1' (On), '0' (Off)");
+  Serial.println("\n=================================================");
+  Serial.println(" SISTEM SIAP! (Perintah Serial: U, D, S, 1, 0)");
+  Serial.println("=================================================\n");
 }
 
 // ================= LOOP UTAMA (CORE 1 - MOTOR & SERIAL) =================
@@ -221,27 +327,50 @@ void loop() {
     prosesPerintah(cmd);
   }
 
-  // 2. Proteksi Real-time
-  if (motorState != 0) {
-    if (bacaSensorStabil(limitSyringePin, HIGH)) {
+  // 2. Proteksi & Eksekusi Pulsa Motor Stepper Presisi Murni
+  if (motorState == 1) {
+    if (bacaSensorStabil(limitSyringePin, !LIMIT_SYRINGE_ACTIVE_STATE)) {
       motorState = 0;
+      digitalWrite(stepPin, LOW);
       Serial.println("EMERGENCY STOP: Syringe terlepas!");
+      return;
     }
-    else if (motorState == 1 && bacaSensorStabil(limitAtasPin, LOW)) {
+    if (bacaSensorStabil(limitAtasPin, LIMIT_ATAS_ACTIVE_STATE)) {
       motorState = 0;
+      digitalWrite(stepPin, LOW);
       Serial.println("ALERT: Limit Atas Tertabrak!");
+      return;
     }
-    else if (motorState == 2 && bacaSensorStabil(limitBawahPin, LOW)) {
-      motorState = 0;
-      Serial.println("ALERT: Limit Bawah Tertabrak!");
+    
+    for (int i = 0; i < 200; i++) {
+      digitalWrite(stepPin, HIGH);
+      delayMicroseconds(pulseDelayUs);
+      digitalWrite(stepPin, LOW);
+      delayMicroseconds(pulseDelayUs);
     }
   }
+  else if (motorState == 2) {
+    if (bacaSensorStabil(limitSyringePin, !LIMIT_SYRINGE_ACTIVE_STATE)) {
+      motorState = 0;
+      digitalWrite(stepPin, LOW);
+      Serial.println("EMERGENCY STOP: Syringe terlepas!");
+      return;
+    }
+    if (bacaSensorStabil(limitBawahPin, LIMIT_BAWAH_ACTIVE_STATE)) {
+      motorState = 0;
+      digitalWrite(stepPin, LOW);
+      Serial.println("ALERT: Limit Bawah Tertabrak!");
+      return;
+    }
 
-  // 3. Eksekusi Pulsa Motor
-  if (motorState != 0) {
-    digitalWrite(stepPin, HIGH);
-    delayMicroseconds(400);  
+    for (int i = 0; i < 200; i++) {
+      digitalWrite(stepPin, HIGH);
+      delayMicroseconds(pulseDelayUs);
+      digitalWrite(stepPin, LOW);
+      delayMicroseconds(pulseDelayUs);
+    }
+  }
+  else {
     digitalWrite(stepPin, LOW);
-    delayMicroseconds(400);
   }
 }
