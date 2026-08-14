@@ -397,7 +397,7 @@ async function bukaDetail(chamberId) {
                 }
             }
 
-            // Set initial syringe position status in detail modal
+            // Set initial syringe position status in detail modal & auto-disable invalid direction buttons
             const dPosBadge = document.getElementById("detail-syringe-pos");
             if (dPosBadge) {
                 const limitAtas = jsonLatest.data.limit_atas || 0;
@@ -405,12 +405,20 @@ async function bukaDetail(chamberId) {
                 if (limitAtas == 1) {
                     dPosBadge.innerText = "Atas (Full)";
                     dPosBadge.className = "badge bg-info ms-1";
+                    if (dBtnUp) dBtnUp.disabled = true;
+                    if (dBtnDown && isDeviceOnline) dBtnDown.disabled = false;
                 } else if (limitBawah == 1) {
                     dPosBadge.innerText = "Bawah (Tutup)";
                     dPosBadge.className = "badge bg-warning text-dark ms-1";
+                    if (dBtnDown) dBtnDown.disabled = true;
+                    if (dBtnUp && isDeviceOnline) dBtnUp.disabled = false;
                 } else {
                     dPosBadge.innerText = "Di Tengah";
                     dPosBadge.className = "badge bg-secondary ms-1";
+                    if (isDeviceOnline) {
+                        if (dBtnUp) dBtnUp.disabled = false;
+                        if (dBtnDown) dBtnDown.disabled = false;
+                    }
                 }
             }
         }
@@ -958,7 +966,7 @@ async function fetchData() {
                             }
                         }
                         
-                        // Update syringe position badge in detail modal
+                        // Update syringe position badge in detail modal & auto-disable invalid direction buttons
                         const dPosBadge = document.getElementById("detail-syringe-pos");
                         if (dPosBadge) {
                             const limitAtas = data.limit_atas || 0;
@@ -966,12 +974,20 @@ async function fetchData() {
                             if (limitAtas == 1) {
                                 dPosBadge.innerText = "Atas (Full)";
                                 dPosBadge.className = "badge bg-info ms-1";
+                                if (dBtnUp) dBtnUp.disabled = true;
+                                if (dBtnDown && isDeviceOnline) dBtnDown.disabled = false;
                             } else if (limitBawah == 1) {
                                 dPosBadge.innerText = "Bawah (Tutup)";
                                 dPosBadge.className = "badge bg-warning text-dark ms-1";
+                                if (dBtnDown) dBtnDown.disabled = true;
+                                if (dBtnUp && isDeviceOnline) dBtnUp.disabled = false;
                             } else {
                                 dPosBadge.innerText = "Di Tengah";
                                 dPosBadge.className = "badge bg-secondary ms-1";
+                                if (isDeviceOnline) {
+                                    if (dBtnUp) dBtnUp.disabled = false;
+                                    if (dBtnDown) dBtnDown.disabled = false;
+                                }
                             }
                         }
                     }
@@ -1050,15 +1066,23 @@ async function moveSyringe(chamberId, direction) {
         return;
     }
 
-    // Proteksi Limit Switch di Web UI: Tolak jika sudah menabrak batas
-    const posBadgeEl = document.getElementById(`syringe-badge-${safeId}`) || document.getElementById(`detail-syringe-status`);
-    const posText = posBadgeEl ? posBadgeEl.innerText.toLowerCase() : "";
+    // Proteksi Limit Switch di Web UI: Ambil teks status posisi dari Modal & Card
+    const detailPosEl = document.getElementById("detail-syringe-pos");
+    const mainBadgeEl = document.getElementById(`syringe-badge-${safeId}`) || document.getElementById(`syringe-pos-${safeId}`);
+    
+    let posText = "";
+    if (detailPosEl && detailPosEl.innerText.trim() !== "") {
+        posText += detailPosEl.innerText.toLowerCase() + " ";
+    }
+    if (mainBadgeEl && mainBadgeEl.innerText.trim() !== "") {
+        posText += mainBadgeEl.innerText.toLowerCase() + " ";
+    }
 
     if (direction === 'D' && (posText.includes("bawah") || posText.includes("tutup"))) {
         alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling BAWAH (Limit Bawah Aktif)! Perintah Turun Ditolak.");
         return;
     }
-    if (direction === 'U' && (posText.includes("atas") || posText.includes("buka"))) {
+    if (direction === 'U' && (posText.includes("atas") || posText.includes("buka") || posText.includes("full"))) {
         alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling ATAS (Limit Atas Aktif)! Perintah Naik Ditolak.");
         return;
     }

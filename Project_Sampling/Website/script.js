@@ -728,15 +728,23 @@ async function moveSyringe(chamberId, direction) {
         return;
     }
 
-    // Proteksi Limit Switch di Web UI: Tolak jika sudah menabrak batas
-    const posBadgeEl = document.getElementById(`syringe-badge-${safeId}`) || document.getElementById(`detail-syringe-status`);
-    const posText = posBadgeEl ? posBadgeEl.innerText.toLowerCase() : "";
+    // Proteksi Limit Switch di Web UI: Ambil teks status posisi dari Modal & Card
+    const detailPosEl = document.getElementById("detail-syringe-pos");
+    const mainBadgeEl = document.getElementById(`syringe-badge-${safeId}`) || document.getElementById(`syringe-pos-${safeId}`);
+    
+    let posText = "";
+    if (detailPosEl && detailPosEl.innerText.trim() !== "") {
+        posText += detailPosEl.innerText.toLowerCase() + " ";
+    }
+    if (mainBadgeEl && mainBadgeEl.innerText.trim() !== "") {
+        posText += mainBadgeEl.innerText.toLowerCase() + " ";
+    }
 
     if (direction === 'D' && (posText.includes("bawah") || posText.includes("tutup"))) {
         alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling BAWAH (Limit Bawah Aktif)! Perintah Turun Ditolak.");
         return;
     }
-    if (direction === 'U' && (posText.includes("atas") || posText.includes("buka"))) {
+    if (direction === 'U' && (posText.includes("atas") || posText.includes("buka") || posText.includes("full"))) {
         alert("⚠️ PERINGATAN: Syringe sudah berada di posisi paling ATAS (Limit Atas Aktif)! Perintah Naik Ditolak.");
         return;
     }
