@@ -70,7 +70,7 @@ void taskSensorDanWiFi(void * pvParameters) {
   http.setReuse(true);  
 
   unsigned long lastPostTime = 0;
-  const unsigned long postInterval = 1200; // Polling 1.2 detik
+  const unsigned long postInterval = 1500; // 1.5 detik
 
   for(;;) {
     unsigned long currentMillis = millis();
@@ -105,6 +105,20 @@ void taskSensorDanWiFi(void * pvParameters) {
       int isLimitAtas = (digitalRead(limitAtasPin) == LIMIT_ATAS_ACTIVE_STATE) ? 1 : 0;
       int isLimitBawah = (digitalRead(limitBawahPin) == LIMIT_BAWAH_ACTIVE_STATE) ? 1 : 0;
 
+      // CETAK DIAGNOSTIK KEMBALI KE SERIAL MONITOR (9600 BAUD)
+      Serial.println("\n================ HASIL PEMBACAAN SENSOR ================");
+      Serial.printf("BME280 Atas  - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t_a, h_a, p_a);
+      Serial.printf("BME280 Bawah - Suhu: %.2f C | Kelembaban: %.2f %% | Tekanan: %.2f hPa\n", t_b, h_b, p_b);
+      Serial.printf("MQ-4 Gas     - Sensor 1: %d PPM | Sensor 2: %d PPM | Sensor 3: %d PPM\n", mq_1, mq_2, mq_3);
+      Serial.println("---------------- RATA-RATA (DIKIRIM KE VERCEL) ----------------");
+      Serial.printf("Suhu Rata-rata: %.2f C | Kelembaban: %.2f %% | Gas Metana: %d PPM\n", avgSuhu, avgKelembaban, avgGasPPM);
+      Serial.println("---------------- STATUS SAKLAR LIMIT SWITCH & KIPAS ------------");
+      Serial.printf("Limit Atas (LS1)    : %s (RAW: %d)\n", isLimitAtas ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitAtasPin));
+      Serial.printf("Limit Bawah (LS2)   : %s (RAW: %d)\n", isLimitBawah ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitBawahPin));
+      Serial.printf("Limit Syringe (LS3) : %s (RAW: %d)\n", isSyringePresent ? "TERTEKAN (AKTIF)" : "TERLEPAS", digitalRead(limitSyringePin));
+      Serial.printf("Status Kipas (Relay): %s | Status Motor: %s\n", fanState == 1 ? "ON (1)" : "OFF (0)", motorState == 1 ? "NAIK" : (motorState == 2 ? "TURUN" : "STOP"));
+      Serial.println("==============================================================\n");
+
       String jsonPayload = "{";
       jsonPayload += "\"device\": \"Chamber 1\", ";
       jsonPayload += "\"suhu\": " + String(avgSuhu, 2) + ", ";
@@ -120,18 +134,23 @@ void taskSensorDanWiFi(void * pvParameters) {
       if (WiFi.status() == WL_CONNECTED) {
         http.begin(client, serverUrl);
         http.addHeader("Content-Type", "application/json");
-        http.setTimeout(1200); 
+        http.setTimeout(1500); 
         int httpResponseCode = http.POST(jsonPayload);
         
         if (httpResponseCode > 0) {
           String response = http.getString();
+          Serial.printf("[HTTP SERVER] Data terkirim! Respon HTTP: %d\n", httpResponseCode);
           String latestCmd = getLatestCommandValue(response);
           if (latestCmd != "") {
+            Serial.println("[COMMAND] Perintah Terbaru Diterima dari Vercel: " + latestCmd);
             prosesPerintah(latestCmd);
           }
+        } else {
+          Serial.printf("[HTTP SERVER] Menunggu respon Vercel (Code: %d)...\n", httpResponseCode);
         }
         http.end();
       } else {
+        Serial.println("[WIFI ALERT] WiFi Terputus! Reconnecting...");
         WiFi.reconnect();
       }
     }
