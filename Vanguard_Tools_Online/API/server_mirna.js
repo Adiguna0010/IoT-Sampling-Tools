@@ -673,12 +673,16 @@ app.post('/api/commands', (req, res) => {
         return res.status(400).json({ status: "gagal", pesan: "Format perintah tidak valid" });
     }
 
-    const query = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES ?';
-    const values = commands.map(c => [c.chamber_id, c.command_name, c.command_value]);
+    const chamberId = commands[0].chamber_id;
+    // Bersihkan antrean perintah lama agar tidak terjadi eksekusi bertumpuk (naik-turun/kagok)
+    db.query('DELETE FROM commands WHERE chamber_id = ?', [chamberId], () => {
+        const query = 'INSERT INTO commands (chamber_id, command_name, command_value) VALUES ?';
+        const values = commands.map(c => [c.chamber_id, c.command_name, c.command_value]);
 
-    db.query(query, [values], (err, results) => {
-        if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
-        res.json({ status: "berhasil", pesan: "Perintah berhasil disimpan" });
+        db.query(query, [values], (err, results) => {
+            if (err) return res.status(500).json({ status: "gagal", pesan: err.message });
+            res.json({ status: "berhasil", pesan: "Perintah berhasil disimpan" });
+        });
     });
 });
 

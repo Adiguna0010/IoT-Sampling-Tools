@@ -174,7 +174,10 @@ void eksekusiMotorNaik() {
     return;
   }
 
+  // 1. KUNCI PIN ARAH DIR DENGAN DELAY OPTOCOUPLER 50us (MENGHILANGKAN MOVING REVERSE TERLEBIH DAHULU)
   digitalWrite(dirPin, HIGH);
+  delayMicroseconds(50);
+
   Serial.printf("[STATUS] Motor NAIK Dipicu | Delay: %d us\n", pulseDelayUs);
 
   // Soft-start murni persis TEST_STEPPER_ONLY (800us -> target 150us)
@@ -225,7 +228,10 @@ void eksekusiMotorTurun() {
     return;
   }
 
+  // 1. KUNCI PIN ARAH DIR DENGAN DELAY OPTOCOUPLER 50us (MENGHILANGKAN MOVING REVERSE TERLEBIH DAHULU)
   digitalWrite(dirPin, LOW);
+  delayMicroseconds(50);
+
   Serial.printf("[STATUS] Motor TURUN Dipicu | Delay: %d us\n", pulseDelayUs);
 
   // Soft-start murni persis TEST_STEPPER_ONLY (800us -> target 150us)
@@ -275,8 +281,20 @@ void prosesPerintah(String cmd) {
     fanState = 0;
     Serial.println("[STATUS] Kipas OFF");
   } else if (cmd == "U") {
+    if (motorState == 1) return; // Jika sudah bergerak NAIK, abaikan agar tidak mengulang akselerasi
+    if (motorState != 0) {
+      motorState = 0; // Hentikan motor sejenak jika sebelumnya bergerak ke arah berlawanan
+      digitalWrite(stepPin, LOW);
+      delay(50);
+    }
     motorState = 1;
   } else if (cmd == "D") {
+    if (motorState == 2) return; // Jika sudah bergerak TURUN, abaikan agar tidak mengulang akselerasi
+    if (motorState != 0) {
+      motorState = 0; // Hentikan motor sejenak jika sebelumnya bergerak ke arah berlawanan
+      digitalWrite(stepPin, LOW);
+      delay(50);
+    }
     motorState = 2;
   } else if (cmd == "S" || cmd == "STOP") {
     motorState = 0;
