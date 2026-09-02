@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - IoT Sampling Tools</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body class="glass-body">
+
+    <!-- Floating Sidebar Kiri -->
+    <aside class="sidebar-pill" style="position: relative;">
+        <div class="logo-icon d-flex justify-content-center align-items-center"><img src="logo.png" alt="Logo" style="width: 58px; height: auto; object-fit: contain; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.15));"></div>
+        <a href="#" class="active" id="nav-dashboard" onclick="switchView('dashboard'); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard Utama"><i class="bi bi-house-door-fill"></i></a>
+        <a href="#" id="nav-analytics" onclick="switchView('analytics'); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Analitik & Prediktif"><i class="bi bi-sprout"></i></a>
+        <a href="#" id="nav-settings" onclick="switchView('settings'); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Pengaturan Sistem"><i class="bi bi-sliders"></i></a>
+        
+        <div class="spacer"></div>
+        
+        <a href="#" class="position-relative" id="btn-notification" onclick="switchView('notifications'); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Notifikasi Alarm">
+            <i class="bi bi-bell"></i>
+            <span id="notif-badge" class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle" style="display: none;">
+                <span class="visually-hidden">New alerts</span>
+            </span>
+        </a>
+        
+        <a href="#" id="btn-help" onclick="switchView('help'); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Help Center">
+            <i class="bi bi-question-circle"></i>
+        </a>
+        
+        <a href="#" onclick="logout(); event.preventDefault();" data-bs-toggle="tooltip" data-bs-placement="right" title="Keluar"><i class="bi bi-box-arrow-right text-danger"></i></a>
+    </aside>
+
+    <main class="main-content" id="view-dashboard">
+        <!-- Top Toolbar -->
+        <header class="top-toolbar">
+            
+            <div class="toolbar-group">
+                <div class="pill">
+                    <i class="bi bi-cpu text-primary"></i> IoT Sampling Tools
+                </div>
+                <div class="pill">
+                    <i class="bi bi-clock text-secondary"></i> <span id="clock">--:--</span>
+                </div>
+                <div class="pill">
+                    <span id="cuaca">Cek Suhu...</span>
+                </div>
+            </div>
+            
+            <div class="toolbar-group" id="operator-controls">
+                <div class="pill pill-controls">
+                    <button class="btn-icon" onclick="kurangiChamber()"><i class="bi bi-dash-lg"></i></button>
+                    <span class="mx-3 fw-bold"><span id="jumlahChamber">1</span> Chamber</span>
+                    <button class="btn-icon" onclick="tambahChamber()"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+
+            <div class="toolbar-group">
+                <div class="pill" title="Total Pengguna">
+                    <i class="bi bi-people-fill text-info"></i> <span id="active-users-count">1</span>
+                </div>
+                <div class="pill pill-dark">
+                    <i class="bi bi-person-circle"></i>
+                    <span id="display-username">Nama</span>
+                    <span class="badge bg-secondary ms-2" id="display-role">Role</span>
+                </div>
+            </div>
+
+        </header>
+
+        <!-- Area Konten Utama di Bawah Toolbar -->
+        <div class="dashboard-content">
+            <!-- Area Kerja Utama (Flow/Cards) -->
+            <div class="workspace custom-scrollbar pb-3 mb-3" id="containerChamber">
+                <!-- Chamber Nodes akan diisi oleh JS -->
+            </div>
+
+            <!-- Panel Bawah (Analytics) -->
+            <footer class="bottom-panel">
+                <div class="panel-half">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="bi bi-bar-chart-line-fill text-primary"></i> Grafik Global</h6>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-light border dropdown-toggle py-0" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="font-size: 11px;">
+                                <i class="bi bi-funnel"></i> Filter
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end p-2 shadow-sm" style="font-size: 12px;">
+                                <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="0" id="gchkSuhu" checked onchange="updateGlobalChartVisibility()"><label class="form-check-label text-danger fw-bold" for="gchkSuhu">Suhu</label></div></li>
+                                <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="1" id="gchkLembap" checked onchange="updateGlobalChartVisibility()"><label class="form-check-label text-primary fw-bold" for="gchkLembap">Kelembapan</label></div></li>
+                                <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="2" id="gchkTekanan" onchange="updateGlobalChartVisibility()"><label class="form-check-label text-success fw-bold" for="gchkTekanan">Tekanan</label></div></li>
+                                <li><div class="form-check"><input class="form-check-input global-chart-filter" type="checkbox" value="3" id="gchkMetana" onchange="updateGlobalChartVisibility()"><label class="form-check-label text-warning fw-bold" for="gchkMetana">Metana</label></div></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="flex-grow: 1; position: relative;">
+                        <canvas id="globalChart"></canvas>
+                    </div>
+                </div>
+                <div class="panel-half ps-4 border-start border-light border-2">
+                    <h6><i class="bi bi-list-check text-success"></i> Service Overview</h6>
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-sm" style="font-size: 13px;">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th>Chamber</th>
+                                    <th>Status Alat</th>
+                                    <th>Terakhir Update</th>    
+                                </tr>
+                            </thead>
+                            <tbody id="overview-table">
+                                <tr><td>Chamber 1</td><td><span class="badge bg-success">Aman</span></td><td>Barusan</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Modal Tambah Chamber -->
+    <div class="modal fade" id="modalTambah" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-square text-primary"></i> Tambah Chamber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Masukkan ID / Nama Chamber:</label>
+                    <input type="text" class="form-control" id="inputChamberId" placeholder="Misal: Chamber 2">
+                    <div id="error-tambah" class="text-danger small mt-2" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="prosesTambahChamber()">Tambah</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Kurangi Chamber -->
+    <div class="modal fade" id="modalKurangi" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-dash-square text-danger"></i> Kurangi Chamber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Pilih Chamber yang ingin disembunyikan:</label>
+                    <select class="form-select" id="inputKurangiChamber"></select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger" onclick="prosesKurangiChamber()">Hapus</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL CHAMBER -->
+    <div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-cpu"></i> Detail - <span id="detailChamberTitle"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-4">
+                        <!-- Kolom Kiri: Sensor Saat Ini -->
+                        <div class="col-lg-3 border-end">
+                            <h6 class="fw-bold mb-2 text-secondary">Nilai Sensor</h6>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small"><i class="bi bi-thermometer-half text-danger"></i> Suhu</span>
+                                    <h5 class="mb-0 fw-bold" id="detail-suhu">-- °C</h5>
+                                </div>
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small"><i class="bi bi-droplet-half text-primary"></i> Kelembapan</span>
+                                    <h5 class="mb-0 fw-bold" id="detail-kelembapan">-- %</h5>
+                                </div>
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small"><i class="bi bi-speedometer2 text-success"></i> Tekanan</span>
+                                    <h5 class="mb-0 fw-bold" id="detail-tekanan">-- hPa</h5>
+                                </div>
+                                <div class="p-2 bg-light rounded shadow-sm border d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small"><i class="bi bi-cloud-haze text-warning"></i> Metana</span>
+                                    <h5 class="mb-0 fw-bold" id="detail-metana">-- ppm</h5>
+                                </div>
+                            </div>
+
+                            <!-- PANEL KONTROL LANJUTAN -->
+                            <hr class="my-4">
+                            <h6 class="fw-bold mb-3 text-secondary">Panel Kontrol <span id="detail-ctrl-badge" class="badge bg-secondary ms-1">Offline</span></h6>
+                            
+                            <ul class="nav nav-pills nav-fill mb-3" id="ctrl-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1" id="tab-manual" data-bs-toggle="pill" data-bs-target="#panel-manual" type="button" role="tab"><i class="bi bi-hand-index-thumb"></i> Manual</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1" id="tab-otomatis" data-bs-toggle="pill" data-bs-target="#panel-otomatis" type="button" role="tab"><i class="bi bi-clock-history"></i> Otomatis</button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="ctrl-tabContent">
+                                <!-- Mode Manual -->
+                                <div class="tab-pane fade show active" id="panel-manual" role="tabpanel">
+                                    <!-- Form Kontrol Manual -->
+                                    <div id="manual-controls-form" class="p-3 bg-light rounded border">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <span class="fw-bold text-secondary small"><i class="bi bi-fan"></i> Kipas</span>
+                                            <label class="switch-mini">
+                                                <input type="checkbox" id="detail-kipas-switch">
+                                                <span class="slider-mini"></span>
+                                            </label>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="fw-bold text-secondary small"><i class="bi bi-syringe"></i> Syringe <span id="detail-syringe-pos" class="badge bg-secondary ms-1" style="font-size:9px;">Di Tengah</span></span>
+                                            <div class="btn-group-tiny">
+                                                <button id="detail-btn-up" class="btn btn-outline-primary btn-sm py-0 px-2">UP</button>
+                                                <button id="detail-btn-down" class="btn btn-outline-primary btn-sm py-0 px-2">DWN</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Alert Offline Manual -->
+                                    <div id="manual-offline-alert" class="d-flex flex-column align-items-center justify-content-center text-center p-4 rounded border bg-light text-muted" style="min-height: 140px; display: none;">
+                                        <i class="bi bi-cloud-slash text-danger" style="font-size: 2rem; margin-bottom: 8px;"></i>
+                                        <span class="fw-bold" style="font-size: 13px;">Device sedang dalam keadaan offline</span>
+                                        <span class="small text-muted" style="font-size: 10px; margin-top: 4px;">Aktifkan alat untuk menggunakan kontrol manual.</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Mode Otomatis -->
+                                <div class="tab-pane fade" id="panel-otomatis" role="tabpanel">
+                                    <!-- Form Kontrol Otomatis -->
+                                    <div id="otomatis-controls-form" class="p-3 border rounded bg-white shadow-sm mt-2">
+                                        <p class="text-center small text-muted mb-3" id="otomatis-deskripsi">Atur jadwal presisi untuk otomatisasi Kipas dan Syringe tanpa intervensi manual.</p>
+                                        <div id="otomatis-list-container" class="mb-3 custom-scrollbar" style="display: none; max-height: 120px; overflow-y: auto;">
+                                            <!-- Daftar Jadwal akan diisi oleh JS -->
+                                        </div>
+                                        <button class="btn btn-primary btn-sm w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#modalJadwal">
+                                            <i class="bi bi-calendar-plus"></i> Buka Editor Jadwal
+                                        </button>
+                                    </div>
+                                    <!-- Alert Offline Otomatis -->
+                                    <div id="otomatis-offline-alert" class="d-flex flex-column align-items-center justify-content-center text-center p-4 rounded border bg-light text-muted mt-2" style="min-height: 140px; display: none;">
+                                        <i class="bi bi-cloud-slash text-danger" style="font-size: 2rem; margin-bottom: 8px;"></i>
+                                        <span class="fw-bold" style="font-size: 13px;">Device sedang dalam keadaan offline</span>
+                                        <span class="small text-muted" style="font-size: 10px; margin-top: 4px;">Aktifkan alat untuk menggunakan kontrol otomatis.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        
+                        <!-- Kolom Kanan: Chart & Tabel -->
+                        <div class="col-lg-9">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold mb-0 text-secondary">Grafik History</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary py-0" type="button" onclick="resetHistoryChartZoom()" title="Reset Tampilan Grafik">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Reset Zoom
+                                    </button>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                            <i class="bi bi-funnel"></i> Filter Grafik
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end p-2 shadow" style="font-size: 13px;">
+                                            <li>
+                                                <div class="form-check">
+                                                    <input class="form-check-input chart-filter" type="checkbox" value="0" id="chkSuhu" checked onchange="updateChartVisibility()">
+                                                    <label class="form-check-label text-danger fw-bold" for="chkSuhu">Suhu</label>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="form-check">
+                                                    <input class="form-check-input chart-filter" type="checkbox" value="1" id="chkLembap" checked onchange="updateChartVisibility()">
+                                                    <label class="form-check-label text-primary fw-bold" for="chkLembap">Kelembapan</label>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="form-check">
+                                                    <input class="form-check-input chart-filter" type="checkbox" value="2" id="chkTekanan" checked onchange="updateChartVisibility()">
+                                                    <label class="form-check-label text-success fw-bold" for="chkTekanan">Tekanan</label>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="form-check">
+                                                    <input class="form-check-input chart-filter" type="checkbox" value="3" id="chkMetana" checked onchange="updateChartVisibility()">
+                                                    <label class="form-check-label text-warning fw-bold" for="chkMetana">Metana</label>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="height: 220px; margin-bottom: 25px;">
+                                <canvas id="historyChart"></canvas>
+                            </div>
+                            
+                            <h6 class="fw-bold mb-2 text-secondary">Log Activity (Database)</h6>
+                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                                <table class="table table-hover table-sm text-center mb-0" style="font-size: 13px;">
+                                    <thead class="sticky-top">
+                                        <tr>
+                                            <th>ID Data</th>
+                                            <th>Suhu (°C)</th>
+                                            <th>Kelembapan (%)</th>
+                                            <th>Tekanan (hPa)</th>
+                                            <th>Metana (ppm)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logTableBody">
+                                        <!-- Data diisi oleh JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <!-- HALAMAN ANALITIK & PREDIKTIF (OPTIMASI DOSIS PUPUK & EMISI METAN) -->
+    <main class="main-content" id="view-analytics" style="display: none;">
+        <!-- Top Toolbar Analitik -->
+        <header class="top-toolbar">
+            <div class="toolbar-group">
+                <div class="pill">
+                    <i class="bi bi-sprout text-success fs-5"></i>
+                    <div>
+                        <span class="fw-bold">Analitik & Prediktif</span>
+                        <span class="text-white-50 ms-1 d-none d-md-inline" style="font-size: 11px;">| Rekomendasi Pupuk & Mitigasi Emisi CH₄</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-group">
+                <!-- Dropdown Pilih Chamber & Tombol Atur Tanaman -->
+                <div class="pill py-1 px-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-cpu text-info"></i>
+                    <span class="small text-white-50">Chamber:</span>
+                    <select id="analyticsChamberSelect" class="form-select form-select-sm bg-dark text-white border-secondary py-0" style="min-width: 130px; font-size: 12px;" onchange="changeAnalyticsChamber(this.value)">
+                        <!-- Diisi otomatis oleh JS -->
+                    </select>
+                </div>
+
+                <button class="btn btn-sm btn-outline-success rounded-pill fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2" onclick="bukaModalTanaman()" title="Atur Nama Komoditas / Tanaman untuk Chamber ini">
+                    <i class="bi bi-pencil-square"></i>
+                    <span id="btn-crop-label">Atur Tanaman (Padi)</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="dashboard-content pb-4">
+            <!-- ROW 1: PANEL 1 (KLASIFIKASI KONDISI LAHAN) & PANEL 2 (REKOMENDASI DOSIS PUPUK) -->
+            <div class="row g-3 mb-3">
+                <!-- PANEL 1: KLASIFIKASI KONDISI LAHAN -->
+                <div class="col-lg-6">
+                    <div class="p-4 rounded-4 shadow-sm border h-100 analytics-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-shield-shaded text-info me-2"></i> 1. Klasifikasi Kondisi Lahan</h6>
+                            <span class="badge bg-secondary-subtle text-light border border-light-subtle" id="land-crop-tag">🌱 Padi Inpari 32</span>
+                        </div>
+                        
+                        <div class="text-white-50 small mb-2">Pertanyaan Utama Sistem: <em>"Bagaimana kondisi tanah saat ini?"</em></div>
+                        
+                        <!-- Indikator Status Lahan -->
+                        <div id="land-status-badge" class="land-status-badge badge-aman mb-3">
+                            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                            <span id="land-status-text" class="fw-bold fs-6">Aman (Kondisi Aerobik Optimal)</span>
+                        </div>
+
+                        <!-- Confidence Score (Tingkat Keyakinan) -->
+                        <div class="p-3 rounded-3 bg-white-5 border border-white-10 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small text-white-50"><i class="bi bi-cpu-fill text-primary me-1"></i> Confidence Score (Tingkat Keyakinan AI)</span>
+                                <span class="badge bg-primary px-2 py-1" id="land-accuracy-pill">Akurasi Prediksi: 94.5%</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3 mt-2">
+                                <h3 class="fw-bold text-white mb-0" id="land-confidence-val">94.5%</h3>
+                                <div class="progress flex-grow-1" style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                                    <div id="land-confidence-bar" class="progress-bar bg-success" role="progressbar" style="width: 94.5%; border-radius: 6px;"></div>
+                                </div>
+                            </div>
+                            <div class="text-white-50 small mt-2" style="font-size: 11px;">
+                                Dihitung dari kombinasi sensor CH₄, Suhu, Kelembapan, dan model klasifikasi pembentukan gas anaerobik tanah padi.
+                            </div>
+                        </div>
+
+                        <p class="small text-white-50 mb-0" id="land-status-desc">
+                            Kondisi tanah berada dalam status aman. Sirkulasi oksigen tanah terjaga baik dan laju emisi gas metana minimal, sehingga sistem perakaran padi siap menyerap nutrisi pupuk secara maksimal.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- PANEL 2: REKOMENDASI DOSIS PUPUK (ACTIONABLE INSIGHT) -->
+                <div class="col-lg-6">
+                    <div class="p-4 rounded-4 shadow-sm border h-100 analytics-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-lightning-charge-fill text-warning me-2"></i> 2. Rekomendasi Dosis Pupuk</h6>
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Actionable Insight</span>
+                        </div>
+
+                        <!-- Status Tindakan -->
+                        <div class="mb-3">
+                            <div class="text-white-50 small mb-1">Status Tindakan Operator:</div>
+                            <div id="fert-action-badge" class="fert-action-badge action-optimal">
+                                <i class="bi bi-calendar-check-fill me-2 fs-5"></i>
+                                <span id="fert-action-text" class="fw-bold">Waktu Optimal Pemupukan</span>
+                            </div>
+                        </div>
+
+                        <!-- Estimasi Dosis -->
+                        <div class="p-3 rounded-3 bg-white-5 border border-white-10 mb-3">
+                            <div class="text-white-50 small mb-1">Estimasi Dosis Pupuk Maksimal yang Disarankan:</div>
+                            <div class="d-flex align-items-baseline gap-2">
+                                <h2 class="fw-bold text-success mb-0" id="fert-dose-num">50</h2>
+                                <span class="text-white-50 fw-semibold">kg / Ha saat ini</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <span class="badge bg-dark border border-secondary text-light py-1 px-2" id="fert-urea-text">Urea: 35 - 50 kg/Ha</span>
+                                <span class="badge bg-dark border border-secondary text-light py-1 px-2" id="fert-npk-text">NPK: 75 - 100 kg/Ha</span>
+                            </div>
+                        </div>
+
+                        <!-- Saran Tambahan (Instruksi Mekanis & Agronomis) -->
+                        <div class="p-3 rounded-3 border border-info-subtle bg-info-subtle-10" id="fert-advice-card">
+                            <div class="fw-bold text-info small mb-1"><i class="bi bi-info-circle-fill me-1"></i> Saran Tindakan Mekanis & Lapangan:</div>
+                            <div class="small text-white-50" id="fert-advice-text">
+                                Lakukan pemupukan pada pagi atau sore hari saat suhu air tanah sejuk. Pertahankan kondisi air macak-macak (1-2 cm) dan lakukan pengeringan lahan berkala (aerasi) untuk menekan laju emisi CH₄ pasca-aplikasi.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROW 2: PANEL 3 (MATRIKS PARAMETER PREDIKTOR) -->
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="p-4 rounded-4 shadow-sm border analytics-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i> 3. Matriks Parameter Prediktor (Dasar Keputusan AI)</h6>
+                            <span class="text-white-50 small"><i class="bi bi-clock-history me-1"></i> Rata-rata Harian & Tren vs Hari Sebelumnya</span>
+                        </div>
+
+                        <div class="row g-3">
+                            <!-- Metana CH4 -->
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded-3 bg-white-5 border border-white-10 text-center h-100">
+                                    <div class="text-white-50 small mb-1"><i class="bi bi-cloud-haze text-warning me-1"></i> Gas Metana (CH₄)</div>
+                                    <h4 class="fw-bold text-warning mb-1" id="mat-metana-val">-- ppm</h4>
+                                    <div class="small fw-semibold" id="mat-metana-trend"><i class="bi bi-dash"></i> Stabil</div>
+                                    <div class="text-white-50 mt-1" style="font-size: 10px;">Batas Aman: &lt; 500 ppm</div>
+                                </div>
+                            </div>
+                            <!-- Suhu -->
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded-3 bg-white-5 border border-white-10 text-center h-100">
+                                    <div class="text-white-50 small mb-1"><i class="bi bi-thermometer-half text-danger me-1"></i> Suhu Tanah / Air</div>
+                                    <h4 class="fw-bold text-danger mb-1" id="mat-suhu-val">-- °C</h4>
+                                    <div class="small fw-semibold" id="mat-suhu-trend"><i class="bi bi-dash"></i> Stabil</div>
+                                    <div class="text-white-50 mt-1" style="font-size: 10px;">Optimal: 24 - 32 °C</div>
+                                </div>
+                            </div>
+                            <!-- Kelembapan -->
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded-3 bg-white-5 border border-white-10 text-center h-100">
+                                    <div class="text-white-50 small mb-1"><i class="bi bi-droplet-half text-primary me-1"></i> Kelembapan</div>
+                                    <h4 class="fw-bold text-primary mb-1" id="mat-kelembapan-val">-- %</h4>
+                                    <div class="small fw-semibold" id="mat-kelembapan-trend"><i class="bi bi-dash"></i> Stabil</div>
+                                    <div class="text-white-50 mt-1" style="font-size: 10px;">Relatif Udara & Tanah</div>
+                                </div>
+                            </div>
+                            <!-- Tekanan Udara -->
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded-3 bg-white-5 border border-white-10 text-center h-100">
+                                    <div class="text-white-50 small mb-1"><i class="bi bi-speedometer2 text-success me-1"></i> Tekanan Udara</div>
+                                    <h4 class="fw-bold text-success mb-1" id="mat-tekanan-val">-- hPa</h4>
+                                    <div class="small fw-semibold text-white-50" id="mat-tekanan-trend"><i class="bi bi-check2"></i> Normal Barometrik</div>
+                                    <div class="text-white-50 mt-1" style="font-size: 10px;">Potensial Redoks (Eh) Estimasi</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROW 3: PANEL 4 (GRAFIK PREDIKSI TREN FORECASTING) -->
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="p-4 rounded-4 shadow-sm border analytics-card">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-white"><i class="bi bi-graph-up-arrow text-info me-2"></i> 4. Grafik Prediksi Tren Emisi Metana (Forecasting 3–5 Hari)</h6>
+                                <div class="text-white-50 small">Memproyeksikan dinamika gas CH₄ untuk kesiapan jadwal pemupukan padi</div>
+                            </div>
+                            
+                            <!-- Legend Lines -->
+                            <div class="d-flex align-items-center gap-3 small flex-wrap">
+                                <span class="d-flex align-items-center gap-1 text-white-50">
+                                    <span class="legend-line-sample solid-sample"></span> Data Historis (Solid)
+                                </span>
+                                <span class="d-flex align-items-center gap-1 text-info">
+                                    <span class="legend-line-sample dashed-sample"></span> Prediksi 3-5 Hari (Dashed)
+                                </span>
+                                <span class="d-flex align-items-center gap-1 text-danger">
+                                    <span class="legend-line-sample danger-sample"></span> Batas Ambang Kritis
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style="position: relative; height: 260px; width: 100%;">
+                            <canvas id="forecastChart"></canvas>
+                        </div>
+
+                        <div class="p-3 rounded-3 mt-3 bg-white-5 border border-white-10 d-flex flex-wrap align-items-center justify-content-between gap-2 small text-white-50">
+                            <div id="forecast-insight-banner">
+                                <i class="bi bi-lightbulb-fill text-warning me-1"></i> <span id="forecast-insight-text">Berdasarkan data saat ini, tren metana diproyeksikan stabil. Pemupukan aman dilakukan sesuai rekomendasi dosis harian.</span>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary py-1 px-3 text-white-50 rounded-pill" onclick="refreshForecastPrediction()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Hitung Ulang Prediksi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROW 4: PANEL 5 (LOG EVALUASI KEPUTUSAN & RETRAINING DATASET) -->
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="p-4 rounded-4 shadow-sm border analytics-card">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-white"><i class="bi bi-clipboard2-check-fill text-success me-2"></i> 5. Log Evaluasi Keputusan & Dataset Pelatihan Ulang (Retraining)</h6>
+                                <div class="text-white-50 small">Riwayat rekomendasi dan feedback validasi operator untuk hyperparameter tuning model AI</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-light border-light-subtle py-1 px-3 rounded-pill" onclick="catatEvaluasiSekarang()">
+                                    <i class="bi bi-bookmark-plus me-1"></i> Rekam Evaluasi Saat Ini
+                                </button>
+                                <button class="btn btn-sm btn-success py-1 px-3 rounded-pill fw-semibold" onclick="exportEvaluationLogs()">
+                                    <i class="bi bi-download me-1"></i> Unduh Dataset Evaluasi (CSV)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive rounded-4 border border-white-10 custom-scrollbar" style="max-height: 250px; overflow-y: auto; background: rgba(255, 255, 255, 0.02);">
+                            <table class="table table-hover table-sm text-white mb-0 align-middle" style="font-size: 13px;">
+                                <thead class="sticky-top" style="background: rgba(10, 20, 38, 0.95);">
+                                    <tr class="text-white-50">
+                                        <th style="min-width: 130px;">Tanggal / Waktu</th>
+                                        <th style="min-width: 120px;">Chamber / Tanaman</th>
+                                        <th style="min-width: 100px;">Gas Metana</th>
+                                        <th style="min-width: 130px;">Kondisi Lahan</th>
+                                        <th style="min-width: 180px;">Rekomendasi Dosis</th>
+                                        <th style="min-width: 140px;" class="text-center">Validasi Operator</th>
+                                        <th style="min-width: 160px;">Catatan Lapangan</th>
+                                        <th style="min-width: 60px;" class="text-end">Hapus</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="evaluation-table-body">
+                                    <!-- Diisi oleh JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Credit Teks -->
+        <div class="text-center mt-3">
+            <p class="text-white-50 small mb-0 fw-semibold" style="font-size: 11px; opacity: 0.65; letter-spacing: 0.5px;">By Poltek Nuklir dan Vanguard Labs Team</p>
+        </div>
+    </main>
+
+    <!-- HALAMAN PENGATURAN (Sembunyi secara default) -->
+    <main class="main-content" id="view-settings" style="display: none;">
+        <header class="toolbar d-flex align-items-center mb-4">
+            <div class="pill fw-bold"><i class="bi bi-sliders text-primary"></i> Pengaturan Sistem</div>
+        </header>
+        
+        <div class="row mb-4">
+            <div class="col-md-6" id="exportDataCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-spreadsheet text-success"></i> Export Data CSV</h5>
+                    <p class="text-muted small">Unduh riwayat data sensor ke format CSV.</p>
+                    <div class="mb-2">
+                        <label class="form-label small mb-0">Pilih Chamber</label>
+                        <select class="form-select form-select-sm" id="export-chamber">
+                            <option value="all">Semua Chamber</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">Dari Tanggal</label>
+                            <input type="date" class="form-control form-control-sm" id="export-start">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-0">Sampai Tanggal</label>
+                            <input type="date" class="form-control form-control-sm" id="export-end">
+                        </div>
+                    </div>
+                    <button class="btn btn-success btn-sm w-100" onclick="exportDataCSV()"><i class="bi bi-download"></i> Unduh Data Sensor</button>
+                </div>
+            </div>
+            <div class="col-md-6" id="changePasswordCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-key text-primary"></i> Ganti Password</h5>
+                    <p class="text-muted small">Ubah kata sandi Anda untuk keamanan akun pribadi.</p>
+                    <div class="mb-2">
+                        <input type="password" class="form-control form-control-sm" id="cp-old" placeholder="Password Lama">
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" class="form-control form-control-sm" id="cp-new" placeholder="Password Baru">
+                    </div>
+                    <button class="btn btn-primary btn-sm w-100" onclick="changeMyPassword()"><i class="bi bi-save"></i> Simpan Password</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6" id="accountManagementCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info"></i> Manajemen Akun</h5>
+                    <p class="text-muted small">Khusus Master Admin: Menyetujui pendaftaran baru dan menghapus pengguna.</p>
+                    <button class="btn btn-primary btn-sm" id="btnKelolaUser" data-bs-toggle="modal" data-bs-target="#modalKelolaUser">Buka Kelola User</button>
+                </div>
+            </div>
+            <div class="col-md-6" id="databaseMaintenanceCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-database text-warning"></i> Pemeliharaan Database</h5>
+                    <p class="text-muted small">Bersihkan data log sensor usang untuk menjaga kecepatan server tetap optimal.</p>
+                    <div class="input-group input-group-sm mb-2" id="dbCleanControl">
+                        <select class="form-select" id="clean-days">
+                            <option value="30">Lebih dari 30 Hari</option>
+                            <option value="60">Lebih dari 60 Hari</option>
+                            <option value="90">Lebih dari 90 Hari</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="cleanDatabase()">Bersihkan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-12" id="serverHealthCard">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-server text-secondary"></i> Status Server</h5>
+                    <ul class="list-unstyled small text-muted mb-0">
+                        <li class="mb-1"><i class="bi bi-cpu me-2"></i> Prosesor: <span id="sh-cpu" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-windows me-2"></i> Sistem Operasi: <span id="sh-os" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-memory me-2"></i> Memori RAM: <span id="sh-ram" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-clock-history me-2"></i> Server Uptime: <span id="sh-uptime" class="fw-bold text-dark">-</span></li>
+                        <li class="mb-1"><i class="bi bi-database-fill me-2"></i> Total Data Sensor: <span id="sh-data" class="fw-bold text-dark">-</span> baris</li>
+                        <li><i class="bi bi-people-fill me-2"></i> Total Anggota: <span id="sh-users" class="fw-bold text-dark">-</span> pengguna</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12" id="threshold-setting">
+                <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Ambang Batas Sensor (Thresholds)</h5>
+                    <p class="text-muted small">Tentukan nilai ambang batas peringatan dini. Jika nilai sensor melewati batas ini, indikator kartu chamber akan menyala berdenyut merah.</p>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="enableThresholds" onchange="saveThresholds(false)" checked>
+                        <label class="form-check-label fw-bold text-dark" for="enableThresholds">Aktifkan Peringatan Ambang Batas</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-danger">Suhu Maks (°C)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-suhu" value="35">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-primary">Kelembapan Maks (%)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-kelembapan" value="80">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-success">Tekanan Min (hPa)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-tekanan" value="900">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1 fw-bold text-warning">Metana Maks (ppm)</label>
+                            <input type="number" class="form-control form-control-sm" id="thresh-metana" value="2000">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm mt-3" onclick="saveThresholds()"><i class="bi bi-save"></i> Simpan Ambang Batas</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MAIN CONTENT: HALAMAN NOTIFIKASI KHUSUS -->
+    <main class="main-content" id="view-notifications" style="display: none;">
+        <!-- Header Halaman -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-light-subtle" style="border-bottom-color: rgba(255,255,255,0.08) !important;">
+            <div>
+                <h4 class="fw-bold mb-1 text-white">Riwayat Notifikasi</h4>
+                <p class="text-muted small mb-0">Daftar log aktivitas dan sistem monitoring secara keseluruhan</p>
+            </div>
+            <button class="btn btn-outline-info btn-sm fw-bold px-3 py-2" onclick="markAllAsReadPage(event)">
+                <i class="bi bi-check2-all me-1"></i> Tandai semua sudah dibaca
+            </button>
+        </div>
+
+        <!-- Wadah List Notifikasi -->
+        <div class="bg-white p-4 rounded-4 shadow" style="max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.02) !important; backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08) !important;">
+            <div id="notifications-page-list" class="custom-scrollbar" style="max-height: 480px; overflow-y: auto; padding-right: 5px;">
+                <!-- Item notifikasi dimuat di sini -->
+            </div>
+        </div>
+
+        <!-- Footer / Credit Teks -->
+        <div class="text-center mt-5">
+            <p class="text-white-50 small mb-0 fw-semibold" style="font-size: 11px; opacity: 0.65; letter-spacing: 0.5px;">By Poltek Nuklir dan Vanguard Labs Team</p>
+        </div>
+    </main>
+
+    <!-- MAIN CONTENT: HALAMAN PANDUAN / DOKUMENTASI -->
+    <main class="main-content" id="view-help" style="display: none;">
+        <!-- Header Halaman -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-light-subtle" style="border-bottom-color: rgba(255,255,255,0.08) !important;">
+            <div>
+                <h4 class="fw-bold mb-1 text-white">Help Center</h4>
+                <p class="text-muted small mb-0">Panduan teknis pengoperasian sistem monitoring Smart Chamber</p>
+            </div>
+        </div>
+
+        <!-- Wadah Panduan (Accordion Style) -->
+        <div class="p-4 rounded-4 shadow" style="max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.02) !important; backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08) !important;">
+            <div class="accordion" id="helpAccordion">
+                
+                <!-- Item 1: Cara Kerja Alat -->
+                <div class="accordion-item mb-3" style="background: rgba(255,255,255,0.01) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px; overflow: hidden;">
+                    <h2 class="accordion-header" id="headingOne">
+                        <button class="accordion-button fw-bold text-white collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne" style="background: transparent !important; color: #ffffff !important; box-shadow: none;">
+                            1. Cara Kerja Alat (Smart Chamber)
+                        </button>
+                    </h2>
+                    <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body text-white-50" style="font-size: 13px; line-height: 1.6;">
+                            Smart Chamber dirancang untuk mengambil sampel udara dan gas secara presisi. Sistem ini beroperasi menggunakan dua sensor utama untuk memastikan kualitas data:
+                            <ul>
+                                <li><strong>Pemantauan Lingkungan:</strong> Sensor BME280 bekerja mengukur Suhu, Kelembapan, dan Tekanan Udara di sekitar area pengambilan sampel.</li>
+                                <li><strong>Pendeteksian Gas:</strong> Sensor MQ-4 secara aktif mendeteksi konsentrasi gas alam (Natural Gas) dan Metana (CH₄).</li>
+                            </ul>
+                            Seluruh proses pengambilan sampel dilakukan secara otomatis melalui mekanisme syringe, dan data sensor akan langsung dikirim serta disimpan ke dalam sistem web secara real-time.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item 2: Cara Akses & Monitoring Web -->
+                <div class="accordion-item mb-3" style="background: rgba(255,255,255,0.01) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px; overflow: hidden;">
+                    <h2 class="accordion-header" id="headingTwo">
+                        <button class="accordion-button fw-bold text-white collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo" style="background: transparent !important; color: #ffffff !important; box-shadow: none;">
+                            2. Cara Akses & Monitoring Web
+                        </button>
+                    </h2>
+                    <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body text-white-50" style="font-size: 13px; line-height: 1.6;">
+                            Sistem dirancang berbasis cloud (tanpa penyimpanan SD Card lokal) sehingga data dapat diakses dari mana saja.
+                            <ul>
+                                <li><strong>Login & Akses:</strong> Buka link web dashboard melalui browser di perangkat Anda, lalu masuk menggunakan kredensial yang telah diberikan.</li>
+                                <li><strong>Monitoring Data:</strong> Pada halaman utama (Beranda), Anda dapat langsung melihat pembaruan angka dari sensor BME280 dan MQ-4 yang disinkronisasi secara otomatis setiap kali alat mengambil sampel.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item 3: Cara Mengatur Jadwal Otomatisasi -->
+                <div class="accordion-item mb-3" style="background: rgba(255,255,255,0.01) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px; overflow: hidden;">
+                    <h2 class="accordion-header" id="headingThree">
+                        <button class="accordion-button fw-bold text-white collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree" style="background: transparent !important; color: #ffffff !important; box-shadow: none;">
+                            3. Cara Mengatur Jadwal Otomatisasi
+                        </button>
+                    </h2>
+                    <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body text-white-50" style="font-size: 13px; line-height: 1.6;">
+                            Alat ini terintegrasi dengan waktu online server (tanpa modul RTC fisik), sehingga jadwal yang Anda buat sangat akurat.
+                            <ul>
+                                <li><strong>Pengaturan Jadwal:</strong> Navigasikan ke menu Otomatisasi/Jadwal di panel sebelah kiri.</li>
+                                <li><strong>Tentukan Waktu:</strong> Masukkan jam dan interval waktu yang diinginkan untuk pengambilan sampel. Sistem akan secara otomatis menggerakkan mekanisme syringe and merekam data sensor tepat pada waktu yang telah Anda tentukan.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item 4: Spesifikasi Alat -->
+                <div class="accordion-item mb-3" style="background: rgba(255,255,255,0.01) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px; overflow: hidden;">
+                    <h2 class="accordion-header" id="headingFour">
+                        <button class="accordion-button fw-bold text-white collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour" style="background: transparent !important; color: #ffffff !important; box-shadow: none;">
+                            4. Spesifikasi Alat (Teknis)
+                        </button>
+                    </h2>
+                    <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body text-white-50" style="font-size: 13px; line-height: 1.6;">
+                            Berikut adalah spesifikasi teknis ringkas dari unit IoT Sampling Tools:
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm table-borderless text-white-50 mb-0" style="font-size: 12.5px;">
+                                    <tbody>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="width: 35%; color: rgba(255,255,255,0.85);">Nama Alat</td>
+                                            <td class="py-2">IoT Sampling Tools (Smart Chamber v2)</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Pengembang</td>
+                                            <td class="py-2">Vanguard Labs Team</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Mikrokontroler</td>
+                                            <td class="py-2">ESP32-D (Konektivitas WiFi & Bluetooth Terintegrasi)</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Sensor Lingkungan</td>
+                                            <td class="py-2">BME280 (Mengukur Suhu, Kelembapan Relatif, dan Tekanan Udara)</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Sensor Gas</td>
+                                            <td class="py-2">MQ-4 (Mendeteksi konsentrasi Gas Metana / CH₄ & Gas Alam)</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Dimensi Chamber</td>
+                                            <td class="py-2">100 cm x 30 cm x 30 cm (P x L x T)</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Struktur Fisik</td>
+                                            <td class="py-2">Rangka Aluminium Profile Modular + Dinding Panel Akrilik Transparan</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold py-2" style="color: rgba(255,255,255,0.85);">Mekanisme Kerja</td>
+                                            <td class="py-2">Pengambilan Sampel semi-otomatis/otomatis menggunakan aktuator kit syringe</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer / Credit Teks -->
+        <div class="text-center mt-5">
+            <p class="text-white-50 small mb-0 fw-semibold" style="font-size: 11px; opacity: 0.65; letter-spacing: 0.5px;">By Poltek Nuklir dan Vanguard Labs Team</p>
+        </div>
+    </main>
+
+    <!-- MODAL KELOLA USER (MASTER ADMIN) -->
+    <div class="modal fade" id="modalKelolaUser" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header border-0 pb-0">
+            <h5 class="modal-title fw-bold"><i class="bi bi-people-fill text-primary"></i> Kelola Pengguna</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" style="font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Password</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th class="text-end">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table-body">
+                        <!-- Data user diload di sini -->
+                    </tbody>
+                </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL ATUR JADWAL OTOMATIS -->
+    <div class="modal fade" id="modalJadwal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 15px;">
+                <div class="modal-header bg-light border-bottom-0 pb-2">
+                    <h5 class="modal-title fw-bold text-secondary"><i class="bi bi-calendar-check text-primary"></i> Editor Jadwal Otomatis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="form-jadwal" onsubmit="tambahJadwal(event)">
+                        <div class="row g-2 align-items-end mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted mb-1">Aksi Perangkat</label>
+                                <select class="form-select" id="jadwal-alat" required>
+                                    <option value="Kipas-1">Nyalakan Kipas (ON)</option>
+                                    <option value="Kipas-0">Matikan Kipas (OFF)</option>
+                                    <option value="Syringe-U">Tarik Syringe (UP)</option>
+                                    <option value="Syringe-D">Turunkan Syringe (DWN)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted mb-1">Waktu (HH:MM)</label>
+                                <input type="time" class="form-control" id="jadwal-waktu" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <h6 class="fw-bold mb-2 text-secondary small">Daftar Jadwal Aktif</h6>
+                    <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-hover align-middle text-center mb-0" style="font-size: 14px;">
+                            <thead class="table-light sticky-top">
+                                <tr><th>Perintah Aksi</th><th>Waktu Eksekusi</th><th>Hapus</th></tr>
+                            </thead>
+                            <tbody id="list-jadwal">
+                                <tr><td colspan="3" class="text-muted py-3">Tidak ada jadwal tersimpan.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 text-end">
+                        <button type="button" class="btn btn-success px-4 fw-bold" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalDetail"><i class="bi bi-check2-circle"></i> Selesai (Done)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <!-- MODAL ATUR METADATA TANAMAN CHAMBER -->
+    <div class="modal fade" id="modalTanamanChamber" tabindex="-1" aria-hidden="true" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 20px; background: #0c1527; color: white; border: 1px solid rgba(255, 255, 255, 0.15);">
+                <div class="modal-header border-bottom border-secondary pb-3">
+                    <h5 class="modal-title fw-bold text-white"><i class="bi bi-sprout text-success me-2"></i> Metadata Tanaman Chamber</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="form-tanaman" onsubmit="simpanMetadataTanaman(event)">
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small fw-bold mb-1">ID Chamber Terpilih</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary" id="cropChamberId" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small fw-bold mb-1">Jenis Komoditas Tanaman</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary" id="cropNameInput" placeholder="Misal: Padi Sawah" value="Padi" required>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label text-white-50 small fw-bold mb-1">Varietas Padi / Tanaman</label>
+                                <input type="text" class="form-control bg-dark text-white border-secondary" id="cropVarietyInput" placeholder="Misal: Inpari 32 / Ciherang" value="Inpari 32">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label text-white-50 small fw-bold mb-1">Luas Petak Lahan (Ha)</label>
+                                <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" id="cropAreaInput" placeholder="1.0" value="1.0">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small fw-bold mb-1">Fase Pertumbuhan Tanaman</label>
+                            <select class="form-select bg-dark text-white border-secondary" id="cropPhaseInput">
+                                <option value="Vegetatif Awal (0-20 HST)">Fase Vegetatif Awal (0 - 20 HST)</option>
+                                <option value="Vegetatif Aktif (21-45 HST)" selected>Fase Vegetatif Aktif / Anakan Maksimal (21 - 45 HST)</option>
+                                <option value="Primordia / Bunting (46-65 HST)">Fase Primordia / Bunting (46 - 65 HST)</option>
+                                <option value="Pengisian Butir / Pematangan (66-90 HST)">Fase Pengisian Butir (66 - 90 HST)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small fw-bold mb-1">Catatan Tambahan Kondisi Lahan</label>
+                            <textarea class="form-control bg-dark text-white border-secondary" id="cropNotesInput" rows="2" placeholder="Misal: Petak A, irigasi macak-macak, tanah lempung berlumpur"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold"><i class="bi bi-save me-1"></i> Simpan Tanaman</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Inisialisasi Tooltip Bootstrap
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+    </script>
+</body>
+</html>
