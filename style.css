@@ -852,53 +852,75 @@ input:checked + .slider-mini:before { transform: translateX(14px); }
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 14px;
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.22) 100%);
-    border: 1px solid rgba(52, 211, 153, 0.45);
+    padding: 5px 12px 5px 8px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(5, 150, 105, 0.28) 100%);
+    border: 1px solid rgba(52, 211, 153, 0.5);
     border-radius: 30px;
-    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 12px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     color: #ffffff;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     cursor: pointer;
+    white-space: nowrap;
     transition: all 0.25s ease;
+    user-select: none;
+    flex-wrap: nowrap;
 }
 
 .badge-crop-tag:hover {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%);
-    border-color: rgba(52, 211, 153, 0.75);
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.45) 100%);
+    border-color: rgba(52, 211, 153, 0.85);
+    box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45);
     transform: translateY(-1px);
 }
 
 .badge-crop-tag .crop-tag-icon {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: rgba(16, 185, 129, 0.3);
     border: 1px solid rgba(52, 211, 153, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #34d399;
-    font-size: 12px;
-    box-shadow: 0 0 8px rgba(52, 211, 153, 0.35);
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+}
+
+.badge-crop-tag .crop-rice-svg {
+    width: 17px;
+    height: 17px;
+    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.7));
 }
 
 .badge-crop-tag .crop-tag-name {
-    font-weight: 600;
-    color: #f8fafc;
+    font-weight: 700;
+    color: #ffffff;
     letter-spacing: 0.2px;
+    white-space: nowrap;
 }
 
 .badge-crop-tag .crop-tag-phase {
-    background: rgba(16, 185, 129, 0.22);
-    border: 1px solid rgba(52, 211, 153, 0.4);
+    background: rgba(16, 185, 129, 0.25);
+    border: 1px solid rgba(52, 211, 153, 0.45);
     color: #6ee7b7;
-    padding: 2px 8px;
-    border-radius: 12px;
+    padding: 3px 10px;
+    border-radius: 14px;
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+
+.badge-crop-tag .crop-tag-edit {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 2px;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.badge-crop-tag:hover .crop-tag-edit {
+    color: #34d399;
+    transform: scale(1.15);
 }
 
 /* Actionable Insight Badge */

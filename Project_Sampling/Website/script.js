@@ -1696,20 +1696,32 @@ function getChamberCrop(chamberId) {
 
 // Membuka modal pengaturan tanaman untuk chamber yang dipilih
 function bukaModalTanaman(chamberId) {
-    const targetChamber = chamberId || selectedAnalyticsChamber || activeChambers[0] || 'Chamber 1';
+    const targetChamber = chamberId || selectedAnalyticsChamber || (activeChambers && activeChambers[0]) || 'Chamber 1';
     const crop = getChamberCrop(targetChamber);
     
-    document.getElementById("cropChamberId").value = targetChamber;
-    document.getElementById("cropNameInput").value = crop.name || "Padi";
-    document.getElementById("cropVarietyInput").value = crop.variety || "Inpari 32";
-    document.getElementById("cropAreaInput").value = crop.area || 1.0;
-    if (document.getElementById("cropPhaseInput")) {
-        document.getElementById("cropPhaseInput").value = crop.phase || "Vegetatif Aktif (21-45 HST)";
-    }
-    document.getElementById("cropNotesInput").value = crop.notes || "";
+    const cropChamberId = document.getElementById("cropChamberId");
+    if (cropChamberId) cropChamberId.value = targetChamber;
     
-    const modal = new bootstrap.Modal(document.getElementById('modalTanamanChamber'));
-    modal.show();
+    const cropNameInput = document.getElementById("cropNameInput");
+    if (cropNameInput) cropNameInput.value = crop.name || "Padi Sawah";
+    
+    const cropVarietyInput = document.getElementById("cropVarietyInput");
+    if (cropVarietyInput) cropVarietyInput.value = crop.variety || "Inpari 32";
+    
+    const cropAreaInput = document.getElementById("cropAreaInput");
+    if (cropAreaInput) cropAreaInput.value = crop.area || 1.0;
+    
+    const cropPhaseInput = document.getElementById("cropPhaseInput");
+    if (cropPhaseInput) cropPhaseInput.value = crop.phase || "Vegetatif Aktif (21-45 HST)";
+    
+    const cropNotesInput = document.getElementById("cropNotesInput");
+    if (cropNotesInput) cropNotesInput.value = crop.notes || "";
+    
+    const modalEl = document.getElementById('modalTanamanChamber');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
 }
 
 // Menyimpan metadata tanaman chamber
@@ -1847,10 +1859,12 @@ async function updateAnalyticsView() {
     
     const cropTag = document.getElementById("land-crop-tag");
     if (cropTag) {
+        const riceSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="crop-rice-svg"><path d="M12 22C12 22 12 14 12 11" stroke="#34d399" stroke-width="2" stroke-linecap="round"/><path d="M12 11C10.5 8.5 8 7 5 7C5 10 6.5 12.5 9 14C10.5 14.9 12 15 12 15" fill="#fbbf24" stroke="#d97706" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 8C13.5 5.5 16 4 19 4C19 7 17.5 9.5 15 11C13.5 11.9 12 12 12 12" fill="#fbbf24" stroke="#d97706" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 14C13.5 11.5 16 10 19 10C19 13 17.5 15.5 15 17C13.5 17.9 12 18 12 18" fill="#34d399" stroke="#059669" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 17C10.5 14.5 8 13 5 13C5 16 6.5 18.5 9 20C10.5 20.9 12 21 12 21" fill="#34d399" stroke="#059669" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 5C11.5 3 12 2 12 2C12 2 12.5 3 12 5Z" fill="#fbbf24" stroke="#d97706" stroke-width="1.2"/></svg>`;
         cropTag.innerHTML = `
-            <span class="crop-tag-icon"><i class="bi bi-sprout"></i></span>
+            <span class="crop-tag-icon">${riceSvg}</span>
             <span class="crop-tag-name">${cropInfo.name || 'Padi Sawah'} - ${cropInfo.variety || 'Inpari 32'}</span>
             <span class="crop-tag-phase">${cropInfo.phase || 'Vegetatif Aktif (21-45 HST)'}</span>
+            <i class="bi bi-pencil-fill crop-tag-edit"></i>
         `;
     }
 
