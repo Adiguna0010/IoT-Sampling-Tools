@@ -146,7 +146,9 @@ class SensorPredictRequest(BaseModel):
     crop_variety: Optional[str] = Field("Inpari 32", example="Inpari 32")
 
 @app.get("/api/health")
+@app.get("/health")
 @app.get("/api")
+@app.get("/")
 def health_check():
     return {
         "status": "online",
@@ -156,6 +158,7 @@ def health_check():
     }
 
 @app.get("/api/model-info")
+@app.get("/model-info")
 def model_info():
     return {
         "model_type": "Multi-Task Deep Neural Network (ANN)",
@@ -165,6 +168,7 @@ def model_info():
     }
 
 @app.post("/api/predict")
+@app.post("/predict")
 def predict_fertilizer(req: SensorPredictRequest):
     try:
         res = run_ann_inference(
