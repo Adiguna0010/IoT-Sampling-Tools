@@ -342,6 +342,7 @@
                     <div>
                         <span class="fw-bold">Analitik & Prediktif</span>
                         <span class="text-white-50 ms-1 d-none d-md-inline" style="font-size: 11px;">| Rekomendasi Pupuk & Mitigasi Emisi CH₄</span>
+                        <span id="ai-engine-badge" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1 ms-2" style="font-size: 10px;" title="Status AI Engine ANN"><i class="bi bi-cpu-fill me-1"></i> PyTorch ANN Live</span>
                     </div>
                 </div>
             </div>
@@ -566,9 +567,12 @@
                                 <h6 class="fw-bold mb-0 text-white">Log Evaluasi Keputusan & Dataset Pelatihan Ulang (Retraining)</h6>
                                 <div class="text-white-50 small">Riwayat rekomendasi dan feedback validasi operator untuk hyperparameter tuning model AI</div>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-wrap">
                                 <button class="btn btn-sm btn-outline-light border-light-subtle py-1 px-3 rounded-pill" onclick="catatEvaluasiSekarang()">
                                     <i class="bi bi-bookmark-plus me-1"></i> Rekam Evaluasi Saat Ini
+                                </button>
+                                <button class="btn btn-sm btn-primary py-1 px-3 rounded-pill fw-semibold" id="btn-retrain-ai" onclick="triggerRetrainAI()">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Latih Ulang AI (Retrain)
                                 </button>
                                 <button class="btn btn-sm btn-success py-1 px-3 rounded-pill fw-semibold" onclick="exportEvaluationLogs()">
                                     <i class="bi bi-download me-1"></i> Unduh Dataset Evaluasi (CSV)

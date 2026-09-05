@@ -1626,8 +1626,36 @@ function markAllAsReadPage(e) {
 }
 
 // ==========================================
-// 10. MODUL ANALITIK & PREDIKTIF DOSIS PUPUK & EMISI METANA
+// 10. MODUL ANALITIK & PREDIKTIF DOSIS PUPUK & EMISI METANA (PYTORCH ANN)
 // ==========================================
+
+// Endpoint AI dinamis: Mendukung Vercel Serverless Function & Localhost API
+function getAIBaseURLs() {
+    const urls = [];
+    if (window.location && window.location.origin && window.location.origin.startsWith("http")) {
+        urls.push(window.location.origin); // Vercel Cloud Serverless API
+    }
+    urls.push("http://127.0.0.1:8000");     // Localhost FastAPI Python Service
+    return urls;
+}
+
+let isPyTorchAILive = false;
+
+// Helper: Memperbarui badge status AI Engine di header analitik
+function updateAIEngineBadge(isLive, text) {
+    isPyTorchAILive = isLive;
+    const badge = document.getElementById("ai-engine-badge");
+    if (!badge) return;
+    if (isLive) {
+        badge.className = "badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1 ms-2";
+        badge.innerHTML = `<i class="bi bi-cpu-fill me-1"></i> ${text || 'PyTorch ANN Live'}`;
+        badge.title = "Terhubung langsung ke Python AI Service (Vercel Serverless / Localhost)";
+    } else {
+        badge.className = "badge rounded-pill bg-secondary-subtle text-light border border-secondary px-2 py-1 ms-2";
+        badge.innerHTML = `<i class="bi bi-gear-fill me-1"></i> ${text || 'Local Fallback'}`;
+        badge.title = "Python AI Service offline. Menggunakan algoritma kalkulasi lokal.";
+    }
+}
 
 let forecastChartInstance = null;
 let selectedAnalyticsChamber = activeChambers[0] || 'Chamber 1';
@@ -1848,6 +1876,77 @@ function calculateLandClassification(sensorData, cropInfo) {
     };
 }
 
+// Inferensi Cerdas ANN (Prioritaskan Python PyTorch Service di Vercel / Localhost, Fallback ke JS Algoritma)
+async function getANNPrediction(sensorData, cropInfo, chamberId) {
+    const metana = parseFloat(sensorData.gas_metana) || 327;
+    const suhu = parseFloat(sensorData.suhu) || 28.5;
+    const lembap = parseFloat(sensorData.kelembaban) || 75.0;
+    const tekanan = parseFloat(sensorData.tekanan) || 1013.25;
+    
+    let hst = 30.0;
+    if (cropInfo && cropInfo.phase) {
+        if (cropInfo.phase.includes("0-20")) hst = 14.0;
+        else if (cropInfo.phase.includes("21-45")) hst = 30.0;
+        else if (cropInfo.phase.includes("46-65")) hst = 55.0;
+        else if (cropInfo.phase.includes("66-100")) hst = 80.0;
+    }
+
+    const payload = {
+        gas_metana: metana,
+        suhu: suhu,
+        kelembaban: lembap,
+        tekanan: tekanan,
+        hst_hari: hst,
+        chamber_id: chamberId,
+        crop_name: cropInfo.name || "Padi Sawah",
+        crop_variety: cropInfo.variety || "Inpari 32"
+    };
+
+    // 1. Coba panggil kandidat endpoint (Vercel Cloud Serverless -> Localhost FastAPI)
+    const candidateUrls = getAIBaseURLs();
+    for (const baseUrl of candidateUrls) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2500);
+            const resp = await fetch(`${baseUrl}/api/predict`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            if (resp.ok) {
+                const aiData = await resp.json();
+                const isVercel = baseUrl.includes("vercel.app") || (!baseUrl.includes("127.0.0.1") && !baseUrl.includes("localhost"));
+                const badgeLabel = isVercel ? "PyTorch ANN (Vercel Live)" : "PyTorch ANN Live";
+                updateAIEngineBadge(true, badgeLabel);
+                return {
+                    isPythonLive: true,
+                    status: aiData.status,
+                    statusText: aiData.status_text,
+                    statusClass: aiData.status_class,
+                    confidence: aiData.confidence,
+                    confidenceClass: aiData.confidence_class || (aiData.status === 'Aman' ? 'bg-success' : aiData.status === 'Waspada' ? 'bg-warning' : 'bg-danger'),
+                    statusDesc: aiData.status_desc,
+                    actionStatus: aiData.action_status,
+                    actionClass: aiData.action_class,
+                    doseNum: aiData.dosis_rekomendasi_utama,
+                    ureaText: aiData.urea_text,
+                    npkText: aiData.npk_text,
+                    adviceText: aiData.saran_tindakan
+                };
+            }
+        } catch (err) {
+            // Lanjutkan ke kandidat endpoint berikutnya
+        }
+    }
+
+    // 2. Fallback cerdas ke penghitungan lokal jika Python belum aktif
+    updateAIEngineBadge(false, "Local ANN Fallback");
+    return calculateLandClassification(sensorData, cropInfo);
+}
+
 // Memperbarui UI Tab Analitik berdasarkan Chamber Terpilih
 async function updateAnalyticsView() {
     const chamberId = selectedAnalyticsChamber;
@@ -1880,7 +1979,8 @@ async function updateAnalyticsView() {
         console.warn("Menggunakan data sensor lokal/cache untuk analitik");
     }
 
-    const classification = calculateLandClassification(sensorData, cropInfo);
+    // Prediksi ANN
+    const classification = await getANNPrediction(sensorData, cropInfo, chamberId);
 
     // 1. Update Panel 1: Klasifikasi Kondisi Lahan
     const landBadge = document.getElementById("land-status-badge");
@@ -1897,7 +1997,7 @@ async function updateAnalyticsView() {
     if (confVal) confVal.innerText = `${classification.confidence}%`;
     if (confBar) {
         confBar.style.width = `${classification.confidence}%`;
-        confBar.className = `progress-bar ${classification.status === 'Aman' ? 'bg-success' : classification.status === 'Waspada' ? 'bg-warning' : 'bg-danger'}`;
+        confBar.className = `progress-bar ${classification.confidenceClass || (classification.status === 'Aman' ? 'bg-success' : classification.status === 'Waspada' ? 'bg-warning' : 'bg-danger')}`;
     }
     if (accPill) accPill.innerHTML = `<i class="bi bi-patch-check-fill me-1"></i> Akurasi Prediksi: ${classification.confidence}%`;
     if (landDesc) landDesc.innerText = classification.statusDesc;
@@ -2273,5 +2373,65 @@ function exportEvaluationLogs() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Mengirim dataset validasi ke Python AI Service untuk Pelatihan Ulang (Retraining)
+async function triggerRetrainAI() {
+    const btn = document.getElementById("btn-retrain-ai");
+    const originalText = btn ? btn.innerHTML : "";
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Melatih AI...`;
+    }
+
+    try {
+        // Format log evaluasi validasi operator menjadi format record training
+        const newRecords = [];
+        fertilizerEvaluationLogs.forEach(log => {
+            if (log.validated === true) {
+                const metanaNum = parseFloat(log.metana) || 327;
+                const statusNum = log.status === "Aman" ? 0 : log.status === "Waspada" ? 1 : 2;
+                const ureaDose = statusNum === 0 ? 50 : statusNum === 1 ? 25 : 0;
+                const npkDose = statusNum === 0 ? 75 : statusNum === 1 ? 40 : 0;
+
+                newRecords.push({
+                    gas_metana: metanaNum,
+                    suhu: 28.5,
+                    kelembaban: 75.0,
+                    tekanan: 1013.25,
+                    hst_hari: 30.0,
+                    dosis_urea: ureaDose,
+                    dosis_npk: npkDose,
+                    status_lahan: statusNum,
+                    notes: log.notes || "Validasi Operator"
+                });
+            }
+        });
+
+        const resp = await fetch(`${AI_API_URL}/api/retrain`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newRecords)
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            addNotification(`🎉 Pelatihan Ulang AI Berhasil! Akurasi Model Baru: ${data.akurasi_baru || 'Tinggi'}`, "bi-patch-check-fill");
+            alert(`Pelatihan Ulang AI Sukses!\n\n${data.message}\nAkurasi Klasifikasi Baru: ${data.akurasi_baru}\nMAE Urea: ${data.mae_urea}\nMAE NPK: ${data.mae_npk}`);
+            updateAnalyticsView();
+        } else {
+            throw new Error(`Server error: ${resp.status}`);
+        }
+    } catch (err) {
+        console.warn("Retrain AI gagal:", err);
+        alert(`Gagal menghubungi Python AI Service di ${AI_API_URL}.\nPastikan server Python (run_service.bat) sedang berjalan!`);
+        addNotification("Gagal melatih ulang AI: Python AI Service Offline", "bi-exclamation-triangle-fill");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
 }
 
