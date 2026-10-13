@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "rewrites": [
     {
       "source": "/api/predict",
@@ -10,12 +9,28 @@
       "destination": "/api/predict.py"
     },
     {
-      "source": "/api/ai-health",
-      "destination": "/api/health.py"
+      "source": "/api/data/latest",
+      "destination": "/api/server"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/server.js"
+      "source": "/api/data/latest/(.*)",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/data/history/(.*)",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/schedules/(.*)",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/schedules",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/commands",
+      "destination": "/api/server"
     }
   ]
 }
