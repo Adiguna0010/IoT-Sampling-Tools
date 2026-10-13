@@ -1,9 +1,9 @@
 // ==========================================
 // 0. KONFIGURASI API URL (LOCAL & ONLINE)
 // ==========================================
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000'
-    : 'https://iot-chamber-backend.vercel.app'; // URL Vercel Backend Anda
+    : (window.location.protocol === 'file:' ? 'https://vanguard-labs-team-tools-l5hbkwpx3-vanguard-labs-team.vercel.app' : '');
 
 // ==========================================
 // 1. OTORISASI (CEK LOGIN)

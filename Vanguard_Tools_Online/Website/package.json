@@ -1,0 +1,14 @@
+{
+  "name": "iot-sampling-tools-root",
+  "version": "1.0.0",
+  "description": "IoT Sampling Tools & AI Prediction Cloud Service",
+  "main": "api/server.js",
+  "scripts": {
+    "start": "node api/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mysql2": "^3.11.0"
+  }
+}
