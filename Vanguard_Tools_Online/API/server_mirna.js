@@ -26,28 +26,44 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 1. KONEKSI KE DATABASE MYSQL (LAPTOP MIRZA / CLOUD ONLINE)
+// 1. KONEKSI KE DATABASE MYSQL / TiDB CLOUD
 // ==========================================
-const isProduction = !!process.env.DB_HOST;
-const db = isProduction 
-    ? mysql.createPool({
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT || 3306,
-        user: process.env.DB_USER || 'root',      
-        password: process.env.DB_PASSWORD || '',      
-        database: process.env.DB_NAME || 'iot_padi',
-        ssl: { rejectUnauthorized: false },
+const isProduction = !!(process.env.DATABASE_URL || process.env.DB_HOST);
+let db = null;
+
+if (process.env.DATABASE_URL) {
+    console.log('Menggunakan DATABASE_URL untuk koneksi MySQL/TiDB! ✅');
+    db = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0
-      })
-    : mysql.createConnection({
+    });
+} else if (process.env.DB_HOST) {
+    const defaultPort = process.env.DB_HOST.includes('tidbcloud.com') ? 4000 : 3306;
+    const dbPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT) : defaultPort;
+    console.log(`Menggunakan Pool Koneksi DB ke ${process.env.DB_HOST}:${dbPort}! ✅`);
+    db = mysql.createPool({
+        host: process.env.DB_HOST,
+        port: dbPort,
+        user: process.env.DB_USER || 'root',      
+        password: process.env.DB_PASSWORD || '',      
+        database: process.env.DB_NAME || 'test',
+        ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+    });
+} else {
+    db = mysql.createConnection({
         host: 'localhost',
         port: 3306,
         user: 'root',      
         password: '',      
         database: 'iot_padi' 
-      });
+    });
+}
 
 function initializeDatabaseSchema(connectionOrPool) {
     console.log("Inisialisasi skema database... 🛠️");

@@ -42,21 +42,28 @@ module.exports = async (req, res) => {
         return res.status(401).json({ status: 'gagal', pesan: 'Username atau Password salah!' });
     };
 
-    const dbHost = process.env.DB_HOST && process.env.DB_HOST.trim() !== '' ? process.env.DB_HOST.trim() : null;
-    if (!dbHost) {
+    const dbHost = (process.env.DB_HOST && process.env.DB_HOST.trim() !== '') ? process.env.DB_HOST.trim() : null;
+    const dbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') ? process.env.DATABASE_URL.trim() : null;
+    if (!dbHost && !dbUrl) {
         return fallbackCheck();
     }
 
     try {
-        const pool = mysql.createPool({
-            host: dbHost,
-            port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_NAME || 'iot_padi',
-            ssl: { rejectUnauthorized: false },
-            connectTimeout: 3000
-        });
+        const pool = dbUrl
+            ? mysql.createPool({
+                uri: dbUrl,
+                ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+                connectTimeout: 5000
+            })
+            : mysql.createPool({
+                host: dbHost,
+                port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : (dbHost.includes('tidbcloud.com') ? 4000 : 3306),
+                user: process.env.DB_USER || 'root',
+                password: process.env.DB_PASSWORD || '',
+                database: process.env.DB_NAME || 'test',
+                ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+                connectTimeout: 5000
+            });
 
         pool.query("SELECT * FROM users WHERE username = ? AND password = ?", [cleanUser, cleanPass], (err, results) => {
             if (err) {

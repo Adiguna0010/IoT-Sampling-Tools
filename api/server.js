@@ -67,32 +67,50 @@ let inMemoryCommands = [];
 let inMemorySchedules = [];
 
 // ==========================================
-// 2. KONEKSI KE MYSQL (JIKA TERSEDIA)
+// 2. KONEKSI KE MYSQL / TiDB CLOUD (JIKA TERSEDIA)
 // ==========================================
-const dbHost = process.env.DB_HOST && process.env.DB_HOST.trim() !== '' ? process.env.DB_HOST.trim() : null;
+const dbHost = (process.env.DB_HOST && process.env.DB_HOST.trim() !== '') ? process.env.DB_HOST.trim() : null;
+const dbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') ? process.env.DATABASE_URL.trim() : null;
 let db = null;
 
-if (dbHost) {
+if (dbUrl) {
     try {
         db = mysql.createPool({
-            host: dbHost,
-            port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_NAME || 'iot_padi',
-            ssl: { rejectUnauthorized: false },
+            uri: dbUrl,
+            ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
             waitForConnections: true,
             connectionLimit: 5,
             queueLimit: 0,
-            connectTimeout: 4000
+            connectTimeout: 5000
         });
-        console.log(`[DB] MySQL pool dikonfigurasi ke host: ${dbHost}`);
+        console.log('[DB] Pool TiDB/MySQL terhubung via DATABASE_URL');
+    } catch (e) {
+        console.warn(`[DB] Gagal membuat pool via DATABASE_URL: ${e.message}`);
+        db = null;
+    }
+} else if (dbHost) {
+    try {
+        const defaultPort = dbHost.includes('tidbcloud.com') ? 4000 : 3306;
+        const dbPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT) : defaultPort;
+        db = mysql.createPool({
+            host: dbHost,
+            port: dbPort,
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'test',
+            ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+            waitForConnections: true,
+            connectionLimit: 5,
+            queueLimit: 0,
+            connectTimeout: 5000
+        });
+        console.log(`[DB] MySQL/TiDB pool dikonfigurasi ke host: ${dbHost}:${dbPort}`);
     } catch (e) {
         console.warn(`[DB] Gagal membuat pool MySQL, beralih ke Fallback Mode: ${e.message}`);
         db = null;
     }
 } else {
-    console.log('[DB] DB_HOST tidak diset. Berjalan dalam Standalone Resilient Mode.');
+    console.log('[DB] DB_HOST / DATABASE_URL tidak diset. Berjalan dalam Standalone Resilient Mode.');
 }
 
 // Helper query dengan auto-fallback
