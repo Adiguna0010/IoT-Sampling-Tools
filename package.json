@@ -2,13 +2,16 @@
   "name": "iot-sampling-tools-root",
   "version": "1.0.0",
   "description": "IoT Sampling Tools & AI Prediction Cloud Service",
-  "main": "api/server.js",
+  "main": "Vanguard_Tools_Online/API/server_mirna.js",
   "scripts": {
-    "start": "node api/server.js"
+    "start": "node Vanguard_Tools_Online/API/server_mirna.js",
+    "build": "cd Vanguard_Tools_Online/API && npm install"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mysql2": "^3.11.0"
+    "mysql2": "^3.11.0",
+    "socket.io": "^4.8.3"
   }
 }

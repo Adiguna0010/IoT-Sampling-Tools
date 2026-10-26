@@ -41,27 +41,31 @@ if (process.env.DATABASE_URL) {
         queueLimit: 0
     });
 } else if (process.env.DB_HOST) {
+    const isCloud = process.env.DB_HOST.includes('tidbcloud.com') || process.env.DB_SSL === 'true';
     const defaultPort = process.env.DB_HOST.includes('tidbcloud.com') ? 4000 : 3306;
     const dbPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT) : defaultPort;
     console.log(`Menggunakan Pool Koneksi DB ke ${process.env.DB_HOST}:${dbPort}! ✅`);
-    db = mysql.createPool({
+    const poolConfig = {
         host: process.env.DB_HOST,
         port: dbPort,
         user: process.env.DB_USER || 'root',      
         password: process.env.DB_PASSWORD || '',      
-        database: process.env.DB_NAME || 'test',
-        ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+        database: process.env.DB_NAME || 'iot_padi',
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0
-    });
+    };
+    if (isCloud) {
+        poolConfig.ssl = { minVersion: 'TLSv1.2', rejectUnauthorized: false };
+    }
+    db = mysql.createPool(poolConfig);
 } else {
     db = mysql.createConnection({
         host: 'localhost',
         port: 3306,
         user: 'root',      
         password: '',      
-        database: 'iot_padi' 
+        database: process.env.DB_NAME || 'iot_padi' 
     });
 }
 

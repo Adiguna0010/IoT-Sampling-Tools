@@ -2,24 +2,25 @@ services:
   - type: web
     name: iot-chamber-backend
     runtime: node
+    plan: free
+    region: singapore
     rootDir: Vanguard_Tools_Online/API
     buildCommand: npm install
     startCommand: node server_mirna.js
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: PORT
-        value: 3000
+        value: 10000
       - key: DB_HOST
         sync: false
-        placeholder: "Masukkan Host DB Aiven Anda"
       - key: DB_PORT
         sync: false
-        placeholder: "Masukkan Port DB Aiven (misal: 12345)"
       - key: DB_USER
         sync: false
-        value: "avnadmin"
       - key: DB_PASSWORD
         sync: false
-        placeholder: "Masukkan Password DB Aiven"
       - key: DB_NAME
+        value: iot_padi
+      - key: DATABASE_URL
         sync: false
-        value: "defaultdb"

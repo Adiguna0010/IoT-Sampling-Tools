@@ -1,7 +1,11 @@
-.vercel
+node_modules/
 .env*
 .env.local
+.env.*.local
+.vercel
 __pycache__/
 *.pyc
 *.pyo
-node_modules/
+.DS_Store
+Thumbs.db
+temp_apalah/

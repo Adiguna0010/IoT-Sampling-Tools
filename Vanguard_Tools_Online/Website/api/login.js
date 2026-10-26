@@ -49,6 +49,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        const isCloudHost = dbHost && (dbHost.includes('tidbcloud.com') || process.env.DB_SSL === 'true');
         const pool = dbUrl
             ? mysql.createPool({
                 uri: dbUrl,
@@ -57,11 +58,11 @@ module.exports = async (req, res) => {
             })
             : mysql.createPool({
                 host: dbHost,
-                port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : (dbHost.includes('tidbcloud.com') ? 4000 : 3306),
+                port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : (isCloudHost ? 4000 : 3306),
                 user: process.env.DB_USER || 'root',
                 password: process.env.DB_PASSWORD || '',
-                database: process.env.DB_NAME || 'test',
-                ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+                database: process.env.DB_NAME || 'iot_padi',
+                ...(isCloudHost ? { ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false } } : {}),
                 connectTimeout: 5000
             });
 
